@@ -1,0 +1,123 @@
+@import "@fontsource-variable/inter";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --nav-h: 64px;
+  --tab-h: 62px;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background: #0a0a0c;
+}
+body {
+  @apply font-sans text-bone antialiased;
+  font-feature-settings: "cv11", "ss01";
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+::selection {
+  background: rgba(155, 140, 255, 0.4);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2c2c33 transparent;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@layer components {
+  .glass {
+    @apply bg-ink-900/70 backdrop-blur-xl border border-white/[0.07];
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200 active:scale-[.97] disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70;
+  }
+  .btn-primary {
+    @apply btn bg-white text-black hover:bg-white/85;
+  }
+  .btn-ghost {
+    @apply btn bg-white/[0.12] text-bone hover:bg-white/20 backdrop-blur-md;
+  }
+  .btn-quiet {
+    @apply btn bg-transparent text-bone-dim hover:text-bone hover:bg-white/5;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-md border border-white/10 bg-white/[0.06] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-bone-dim;
+  }
+  .chip-amber {
+    @apply border-amber/40 bg-amber/10 text-amber;
+  }
+  .input {
+    @apply w-full rounded-xl border border-white/10 bg-ink-800 px-4 py-2.5 text-sm text-bone placeholder:text-bone-mute outline-none transition focus:border-white/40 focus:ring-2 focus:ring-white/10;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-bone-mute;
+  }
+  .card {
+    @apply rounded-2xl border border-white/[0.07] bg-ink-900/80 p-5;
+  }
+  .skeleton {
+    @apply relative overflow-hidden bg-ink-800 before:absolute before:inset-0 before:-translate-x-full before:animate-shimmer before:bg-gradient-to-r before:from-transparent before:via-white/[0.06] before:to-transparent;
+  }
+}
+
+
+/* Vidstack theme: clean white controls, large touch targets on phones */
+.player {
+  --media-brand: #ffffff;
+  --media-focus-ring-color: #ffffff;
+  --video-brand: #ffffff;
+  --video-border-radius: 0px;
+  --video-controls-color: #f4f4f6;
+  --video-slider-fill-bg: #ffffff;
+  --video-time-slider-track-height: 5px;
+}
+@media (min-width: 640px) {
+  .player { --video-border-radius: 20px; }
+}
+[data-media-player] {
+  border-radius: inherit;
+}
+@media (pointer: coarse) {
+  .player { --video-button-size: 44px; --video-menu-button-size: 40px; }
+}
+.safe-b { padding-bottom: env(safe-area-inset-bottom); }
+.safe-t { padding-top: env(safe-area-inset-top); }
+.snap-row { scroll-snap-type: x proximity; }
+
+@keyframes kenburns {
+  from { transform: scale(1.0); }
+  to { transform: scale(1.07); }
+}
+.animate-kenburns { animation: kenburns 14s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-kenburns, .animate-rise, .animate-fade { animation: none !important; }
+}
+
+/* Phones and tablets: live blur behind translucent bars/panels is the main cause of janky scrolling and
+   laggy player controls on mobile GPUs. The translucent backgrounds stay; only the blur goes. */
+@media (pointer: coarse) {
+  *, *::before, *::after {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .animate-kenburns { animation: none !important; }
+  /* Without the blur, a translucent sheet lets the player's controls and titles show through it. */
+  .sheet { background-color: #0a0a0c !important; }
+}
+/* Rows below the fold skip layout and paint until they're scrolled near. */
+.row-cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 340px;
+}

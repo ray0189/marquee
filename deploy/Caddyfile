@@ -1,0 +1,80 @@
+{
+	auto_https off
+	admin off
+	servers {
+		# cloudflared (a Cloudflare Tunnel) reaches Caddy from a Docker network and passes on the visitor's real
+		# scheme and IP. Trust those headers only from Docker's own address range (172.16.0.0/12), so secure
+		# cookies and per-visitor rate limits work through the tunnel while nobody, not even a device on the LAN
+		# (192.168.x.x), can forge them.
+		trusted_proxies static 172.16.0.0/12
+		client_ip_headers Cf-Connecting-Ip X-Forwarded-For
+	}
+}
+
+(app) {
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+	handle /robots.txt {
+		respond "User-agent: *\nDisallow: /\n" 200
+	}
+	handle /api/* {
+		reverse_proxy api:8000 {
+			flush_interval -1
+			header_up X-Real-IP {client_ip}
+		}
+	}
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		root * /srv
+		file_server
+	}
+	handle {
+		root * /srv
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Friends' host: the admin panel and admin API do not exist here.
+http://{$WATCH_HOST} {
+	# A `handle`, not a bare `respond`: Caddy runs handle blocks before respond, so a bare respond never fired
+	# and the admin panel was reachable here. Handles run in order and only the first match runs.
+	@admin path /admin /admin/* /api/admin /api/admin/*
+	handle @admin {
+		respond 404
+	}
+	import app
+}
+
+# Your host: put Cloudflare Access in front of this one.
+http://{$ADMIN_HOST} {
+	@root path /
+	redir @root /admin 302
+	import app
+}
+
+# Admin on its own port (published as ADMIN_PORT, 8081 by default) so it works by plain IP on the LAN.
+# Keep this port off the internet: only expose 8080 (or use the tunnel + Cloudflare Access setup).
+:8081 {
+	@root path /
+	redir @root /admin 302
+	import app
+}
+
+# Anything else (a LAN IP like 192.168.x.x, a tunnel hostname you forgot to list) is treated as the
+# friends' site, so the admin panel can never appear there.
+:80 {
+	# A `handle`, not a bare `respond`: Caddy runs handle blocks before respond, so a bare respond never fired
+	# and the admin panel was reachable here. Handles run in order and only the first match runs.
+	@admin path /admin /admin/* /api/admin /api/admin/*
+	handle @admin {
+		respond 404
+	}
+	import app
+}

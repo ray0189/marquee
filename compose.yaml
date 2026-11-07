@@ -1,0 +1,128 @@
+name: marquee
+
+x-api: &api
+  build: ./api
+  env_file:
+    - path: .env
+      required: false
+  volumes: [appdata:/data]
+  environment:
+    DATABASE_URL: postgresql+asyncpg://marquee:${POSTGRES_PASSWORD:-marquee}@postgres:5432/marquee
+    REDIS_URL: redis://redis:6379/0
+    MEILI_URL: http://meili:7700
+    MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-marquee-internal-meili-key}
+    PUBLIC_WATCH_URL: ${PUBLIC_WATCH_URL:-http://localhost:8080}
+  restart: unless-stopped
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+      args:
+        APP_NAME: ${APP_NAME:-Marquee}
+    environment:
+      WATCH_HOST: ${WATCH_HOST:-localhost}
+      ADMIN_HOST: ${ADMIN_HOST:-admin.localhost}
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${ADMIN_PORT:-8081}:8081"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    <<: *api
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health').status==200 else 1)"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 15s
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      meili: { condition: service_started }
+
+  worker:
+    <<: *api
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      api: { condition: service_healthy }
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: marquee
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-marquee}
+      POSTGRES_DB: marquee
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marquee"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  meili:
+    image: getmeili/meilisearch:v1.10
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-marquee-internal-meili-key}
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: "true"
+    volumes: [meilidata:/meili_data]
+    restart: unless-stopped
+
+  # Nightly backup into ./backups (next to this file): a database dump plus the session secret, which encrypts
+  # the stored keys and signs every invite link. Keeps 14 days. Point Duplicati (or any backup tool) at that folder.
+  backup:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-marquee}
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+      - appdata:/data:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        until pg_isready -h postgres -U marquee -q; do sleep 5; done
+        while true; do
+          d=$$(date +%F)
+          pg_dump -h postgres -U marquee marquee | gzip > /backups/marquee-$$d.sql.gz.tmp
+          mv /backups/marquee-$$d.sql.gz.tmp /backups/marquee-$$d.sql.gz
+          cp /data/session_secret /backups/session_secret
+          chmod 600 /backups/session_secret /backups/marquee-$$d.sql.gz
+          find /backups -name 'marquee-*.sql.gz' -mtime +14 -delete
+          echo "backup written: marquee-$$d.sql.gz"
+          sleep 86400
+        done
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+
+  # docker compose --profile tunnel up -d   (needs CLOUDFLARE_TUNNEL_TOKEN in .env)
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.1
+    profiles: [tunnel]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [web]
+    restart: unless-stopped
+
+volumes:
+  appdata:
+  pgdata:
+  redisdata:
+  meilidata:
