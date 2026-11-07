@@ -130,6 +130,12 @@ input.volume {
   border-radius: 9999px;
   background: linear-gradient(to right, #f4f4f6 var(--vol), rgba(255, 255, 255, 0.25) var(--vol));
 }
+/* Boostable: a tick marks 100%; the fill past it (the boost) is amber. */
+input.volume.boostable {
+  background:
+    linear-gradient(to right, transparent calc(50% - 1px), rgba(255, 255, 255, 0.9) calc(50% - 1px), rgba(255, 255, 255, 0.9) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(to right, #f4f4f6 min(var(--vol), 50%), #b9aeff min(var(--vol), 50%), #b9aeff var(--vol), rgba(255, 255, 255, 0.25) var(--vol));
+}
 input.volume::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 12px;

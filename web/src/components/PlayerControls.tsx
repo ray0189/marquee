@@ -2,6 +2,7 @@ import { Captions, useCaptionOptions, useMediaRemote, useMediaState, type MediaP
 import "@vidstack/react/player/styles/default/captions.css";
 import { Airplay, ArrowLeft, AudioLines, Cast, Check, Info, Expand, Gauge, Loader2, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, Shrink, Subtitles, Volume1, Volume2, VolumeX, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { canBoost, setBoost as applyBoost } from "../lib/boost";
 import { castTime, castToggle, startCast, stopCast, useCast, type CastMedia } from "../lib/cast";
 
 /** Nuvio-style overlay: big centre transport, ±10 s arc buttons, tap-to-seek bar, side panels,
@@ -57,6 +58,22 @@ export function PlayerControls(p: Props) {
   const muted = useMediaState("muted", p.player);
   const canSetVolume = useMediaState("canSetVolume", p.player); // false on iPhone/iPad: only the side buttons can
   const quiet = muted || volume === 0;
+  const [gainBoost, setGainBoost] = useState(1); // 1 = off; up to 2 (200%)
+  const videoEl = () => p.player.current?.el?.querySelector("video") ?? null;
+  const boostable = canBoost(videoEl());
+  const level = quiet ? 0 : volume < 1 ? volume : gainBoost; // slider position: 0..1 volume, 1..2 boost
+  const setLevel = (v: number) => {
+    const video = videoEl();
+    if (v > 1 && video && applyBoost(video, v)) {
+      remote.changeVolume(1);
+      setGainBoost(v);
+    } else {
+      if (gainBoost > 1 && video) applyBoost(video, 1);
+      setGainBoost(1);
+      remote.changeVolume(Math.min(1, v));
+    }
+    if (muted && v > 0) remote.unmute();
+  };
   const canAirPlay = useMediaState("canAirPlay", p.player);
   const cast = useCast();
   const casting = cast.state === "connected" || cast.state === "connecting";
@@ -317,22 +334,21 @@ export function PlayerControls(p: Props) {
               {quiet ? <VolumeX size={18} /> : volume < 0.5 ? <Volume1 size={18} /> : <Volume2 size={18} />}
             </Btn>
             {canSetVolume && (
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.02}
-                value={quiet ? 0 : volume}
-                aria-label="Volume"
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  remote.changeVolume(v);
-                  if (muted && v > 0) remote.unmute();
-                  poke();
-                }}
-                className="volume ml-1 w-16 cursor-pointer transition-[width] duration-200 sm:w-0 sm:opacity-0 sm:group-hover/vol:w-24 sm:group-hover/vol:opacity-100 sm:focus-visible:w-24 sm:focus-visible:opacity-100"
-                style={{ ["--vol" as string]: `${(quiet ? 0 : volume) * 100}%` }}
-              />
+              <>
+                <input
+                  type="range"
+                  min={0}
+                  max={boostable ? 2 : 1}
+                  step={0.02}
+                  value={level}
+                  aria-label={boostable ? "Volume (past the middle mark boosts up to 200%)" : "Volume"}
+                  title={boostable ? "Past the mark boosts up to 200%" : undefined}
+                  onChange={(e) => (setLevel(Number(e.target.value)), poke())}
+                  className={`volume ${boostable ? "boostable" : ""} ml-1 w-16 cursor-pointer transition-[width] duration-200 sm:w-0 sm:opacity-0 sm:group-hover/vol:w-28 sm:group-hover/vol:opacity-100 sm:focus-visible:w-28 sm:focus-visible:opacity-100`}
+                  style={{ ["--vol" as string]: `${(level / (boostable ? 2 : 1)) * 100}%` }}
+                />
+                {gainBoost > 1 && !quiet && <span className="ml-1.5 text-[11px] font-semibold tabular-nums text-amber-glow">{Math.round(gainBoost * 100)}%</span>}
+              </>
             )}
           </div>
           <div className="flex-1" />
