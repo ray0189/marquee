@@ -1,6 +1,6 @@
 import { Captions, useCaptionOptions, useMediaRemote, useMediaState, type MediaPlayerInstance } from "@vidstack/react";
 import "@vidstack/react/player/styles/default/captions.css";
-import { Airplay, ArrowLeft, AudioLines, Cast, Check, Info, Expand, Gauge, Loader2, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, Shrink, Subtitles, X } from "lucide-react";
+import { Airplay, ArrowLeft, AudioLines, Cast, Check, Info, Expand, Gauge, Loader2, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, Shrink, Subtitles, Volume1, Volume2, VolumeX, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { castTime, castToggle, startCast, stopCast, useCast, type CastMedia } from "../lib/cast";
 
@@ -53,6 +53,10 @@ export function PlayerControls(p: Props) {
   const fullscreen = useMediaState("fullscreen", p.player);
   const canPip = useMediaState("canPictureInPicture", p.player);
   const rate = useMediaState("playbackRate", p.player);
+  const volume = useMediaState("volume", p.player);
+  const muted = useMediaState("muted", p.player);
+  const canSetVolume = useMediaState("canSetVolume", p.player); // false on iPhone/iPad: only the side buttons can
+  const quiet = muted || volume === 0;
   const canAirPlay = useMediaState("canAirPlay", p.player);
   const cast = useCast();
   const casting = cast.state === "connected" || cast.state === "connecting";
@@ -308,6 +312,29 @@ export function PlayerControls(p: Props) {
           <Btn label={paused ? "Play" : "Pause"} onClick={() => remote.togglePaused()}>
             {paused ? <Play size={18} className="fill-current" /> : <Pause size={18} className="fill-current" />}
           </Btn>
+          <div className="group/vol flex items-center">
+            <Btn label={quiet ? "Unmute" : "Mute"} onClick={() => (quiet && volume === 0 ? remote.changeVolume(0.5) : remote.toggleMuted(), poke())}>
+              {quiet ? <VolumeX size={18} /> : volume < 0.5 ? <Volume1 size={18} /> : <Volume2 size={18} />}
+            </Btn>
+            {canSetVolume && (
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.02}
+                value={quiet ? 0 : volume}
+                aria-label="Volume"
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  remote.changeVolume(v);
+                  if (muted && v > 0) remote.unmute();
+                  poke();
+                }}
+                className="volume ml-1 w-16 cursor-pointer transition-[width] duration-200 sm:w-0 sm:opacity-0 sm:group-hover/vol:w-24 sm:group-hover/vol:opacity-100 sm:focus-visible:w-24 sm:focus-visible:opacity-100"
+                style={{ ["--vol" as string]: `${(quiet ? 0 : volume) * 100}%` }}
+              />
+            )}
+          </div>
           <div className="flex-1" />
           <Btn label="Audio" active={panel === "audio"} onClick={() => setPanel(panel === "audio" ? null : "audio")}>
             <AudioLines size={18} />

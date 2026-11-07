@@ -121,3 +121,26 @@ body {
   content-visibility: auto;
   contain-intrinsic-size: auto 340px;
 }
+
+/* Player volume slider: thin track filled up to the current volume, small white thumb. */
+input.volume {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background: linear-gradient(to right, #f4f4f6 var(--vol), rgba(255, 255, 255, 0.25) var(--vol));
+}
+input.volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #fff;
+}
+input.volume::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 9999px;
+  background: #fff;
+}
