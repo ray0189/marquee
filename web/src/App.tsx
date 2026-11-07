@@ -9,7 +9,8 @@ import Join from "./pages/Join";
 import NoAccess from "./pages/NoAccess";
 import Title from "./pages/Title";
 
-const Watch = lazy(() => import("./pages/Watch"));
+const loadWatch = () => import("./pages/Watch");
+const Watch = lazy(loadWatch);
 const AdminApp = lazy(() => import("./pages/admin/AdminApp"));
 
 function Splash() {
@@ -34,6 +35,13 @@ function Protected() {
       })
       .catch(() => nav("/no-access", { replace: true }));
   }, [nav]);
+  // Fetch the player in the background once signed in, so pressing Play doesn't wait for ~110 KB of code.
+  // Skipped when the device asks to save data.
+  useEffect(() => {
+    if (label === null || (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
+    const idle = window.requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1500));
+    idle(() => void loadWatch().catch(() => undefined));
+  }, [label]);
   useEffect(() => {
     const deny = () => nav("/no-access", { replace: true });
     window.addEventListener("mq:noaccess", deny);

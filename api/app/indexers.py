@@ -69,10 +69,30 @@ def parse_streams(data: dict, name: str) -> list[Candidate]:
     return out
 
 
+async def _pause(name: str, e: Exception) -> None:
+    """Back off an indexer in proportion to what went wrong. One slow or failed answer doesn't remove a source
+    for everyone (3 in a row do); a rate limit is honoured for as long as the indexer asks."""
+    resp = getattr(e, "response", None)
+    status = getattr(resp, "status_code", None)
+    if status == 429:
+        try:
+            wait = int(resp.headers.get("retry-after", "600"))
+        except ValueError:
+            wait = 600
+        await redis.set(f"ix:down:{name}", "1", ex=max(60, min(wait, 1800)))
+    elif "moved or shut down" in str(e):
+        await redis.set(f"ix:down:{name}", "1", ex=3600)
+    else:
+        fails = await redis.incr(f"ix:fails:{name}")
+        await redis.expire(f"ix:fails:{name}", 300)
+        if fails >= 3:
+            await redis.set(f"ix:down:{name}", "1", ex=300)
+
+
 async def fetch(ix: dict, media_type: str, imdb: str, season: int | None, episode: int | None) -> list[Candidate]:
     name = ix["name"]
     if await redis.exists(f"ix:down:{name}"):
-        return []  # circuit open: skip a failing indexer for 5 minutes
+        return []  # circuit open: this indexer is paused (see _pause)
     path = f"/stream/movie/{imdb}.json" if media_type == "movie" else f"/stream/series/{imdb}:{season}:{episode}.json"
     started = time.monotonic()
     try:
@@ -82,9 +102,10 @@ async def fetch(ix: dict, media_type: str, imdb: str, season: int | None, episod
             raise RuntimeError(f"indexer moved or shut down (redirects to {r.headers.get('location', '?')})")
         r.raise_for_status()
         res = parse_streams(r.json(), name)
-    except Exception:
-        await redis.set(f"ix:down:{name}", "1", ex=300)
+    except Exception as e:
+        await _pause(name, e)
         await redis.set(f"ix:last:{name}", json.dumps({"ok": False, "ms": int((time.monotonic() - started) * 1000), "count": 0, "at": time.time()}), ex=86400)
         raise
+    await redis.delete(f"ix:fails:{name}")
     await redis.set(f"ix:last:{name}", json.dumps({"ok": True, "ms": int((time.monotonic() - started) * 1000), "count": len(res), "at": time.time()}), ex=86400)
     return res

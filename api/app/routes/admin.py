@@ -195,8 +195,9 @@ async def put_indexers(body: list[store.Indexer]):
     if len({ix.name for ix in body}) != len(body):
         raise HTTPException(422, {"code": "DUP", "message": "Indexer names must be unique"})
     await store.put("indexers", [ix.model_dump() for ix in body])
-    async for k in redis.scan_iter("ix:down:*"):
-        await redis.delete(k)
+    async for k in redis.scan_iter("ix:*:*"):  # clears pauses and failure counts (ix:down, ix:fails)
+        if not k.startswith(("ix:last:",)):
+            await redis.delete(k)
     async for k in redis.scan_iter("streams:*"):
         await redis.delete(k)
     return body
