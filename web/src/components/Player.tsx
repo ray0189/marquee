@@ -383,8 +383,10 @@ export function Player(p: Props) {
             }}
             onCanPlay={() => {
               if (!playing.current) {
+                // Only a known, full length can say "wrong film": TorBox's transcode reports just the part
+                // converted so far (or no length at all), and longer cuts (extended, director's) are fine.
                 const d = player.current?.duration ?? 0;
-                if (p.runtime && d > 0 && Math.abs(d / 60 - p.runtime) / p.runtime > 0.3) {
+                if (ready.mode !== "hls" && p.runtime && isFinite(d) && d > 60 && d / 60 < p.runtime * 0.7) {
                   setMismatch(`This file runs ${fmtRuntime(d / 60)}, but the film is ${fmtRuntime(p.runtime)}. It may be a different film with the same name.`);
                 }
                 setStartMs(Date.now() - t0.current);
