@@ -5,6 +5,35 @@ on:
   pull_request:
 
 jobs:
+  # Scripts run inside Linux containers: a CRLF line ending breaks them ("#!/bin/sh\r": no such file).
+  line-endings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No CRLF in tracked text files
+        run: |
+          bad=$(git ls-files --eol | awk '$1 ~ /crlf/ || $2 ~ /crlf/ {print $NF}')
+          if [ -n "$bad" ]; then echo "CRLF line endings in:"; echo "$bad"; exit 1; fi
+      - name: Entrypoint is executable and starts with a clean shebang
+        run: |
+          git ls-files -s api/docker-entrypoint.sh | grep -q '^100755' || { echo "api/docker-entrypoint.sh is not executable in git"; exit 1; }
+          [ "$(head -c 10 api/docker-entrypoint.sh | od -An -c | tr -d ' ')" = '#!/bin/sh\n' ] || { echo "bad shebang line"; exit 1; }
+
+  # A fresh clone on Windows (core.autocrlf=true) must still give LF where it matters.
+  windows-checkout:
+    runs-on: windows-latest
+    steps:
+      - run: git config --global core.autocrlf true
+      - uses: actions/checkout@v4
+      - name: Checked-out scripts use LF
+        shell: pwsh
+        run: |
+          foreach ($f in @("api/docker-entrypoint.sh", "deploy.sh", "compose.yaml", "deploy/Caddyfile")) {
+            $bytes = [IO.File]::ReadAllBytes((Resolve-Path $f))
+            if ($bytes -contains 13) { Write-Error "$f has CRLF line endings after a Windows checkout"; exit 1 }
+          }
+          "All LF"
+
   api:
     runs-on: ubuntu-latest
     services:
@@ -39,8 +68,31 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-  images:
+  # Build and start the whole stack exactly as a new user would, with no .env, and check every service.
+  compose-smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker compose build
+      - run: docker compose config -q
+      - name: Start the stack
+        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: API is healthy and the admin panel is local-only
+        run: |
+          curl -fsS http://localhost:8080/api/health
+          curl -fsS -o /dev/null http://localhost:8081/admin
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/admin/setup/state)
+          [ "$code" = 404 ] || { echo "admin API reachable on the public port ($code)"; exit 1; }
+      - name: Worker is running
+        run: '[ "$(docker compose ps worker --format "{{.State}}")" = running ]'
+      - name: Session secret exists and the first backup has it
+        run: |
+          docker compose exec -T api test -s /data/session_secret
+          for i in $(seq 1 30); do docker compose logs backup | grep -q "backup written" && break; sleep 2; done
+          docker compose logs backup
+          docker compose logs backup | grep -q "backup written"
+          sudo test -s backups/session_secret
+      - name: Logs on failure
+        if: failure()
+        run: docker compose ps -a; docker compose logs --tail 80
+      - if: always()
+        run: docker compose down -v

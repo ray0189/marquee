@@ -95,20 +95,42 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        set -e
+        set -o pipefail
+        # Never exits on a failure (that caused restart loops): logs what's wrong and tries again later.
         until pg_isready -h postgres -U marquee -q; do sleep 5; done
+        # The api container creates the session secret on its first start. Wait for it (bounded), since a
+        # dump without its secret can't be restored with working keys and links.
+        n=0
+        until [ -s /data/session_secret ]; do
+          n=$$((n + 1))
+          if [ $$n -eq 60 ]; then
+            echo "ERROR: /data/session_secret still missing after 5 minutes. The api container creates it on" \
+                 "first start; check 'docker compose logs api'. Still waiting; no backup until it exists."
+          fi
+          sleep 5
+        done
         while true; do
           d=$$(date +%F)
-          pg_dump -h postgres -U marquee marquee | gzip > /backups/marquee-$$d.sql.gz.tmp
-          mv /backups/marquee-$$d.sql.gz.tmp /backups/marquee-$$d.sql.gz
-          cp /data/session_secret /backups/session_secret
-          chmod 600 /backups/session_secret /backups/marquee-$$d.sql.gz
-          find /backups -name 'marquee-*.sql.gz' -mtime +14 -delete
-          echo "backup written: marquee-$$d.sql.gz"
-          sleep 86400
+          if [ ! -s /data/session_secret ]; then
+            echo "ERROR: /data/session_secret is missing; skipping this backup (retrying in 10 minutes)."
+            sleep 600; continue
+          fi
+          if pg_dump -h postgres -U marquee marquee | gzip > /backups/marquee-$$d.sql.gz.tmp; then
+            mv /backups/marquee-$$d.sql.gz.tmp /backups/marquee-$$d.sql.gz
+            cp /data/session_secret /backups/session_secret
+            chmod 600 /backups/session_secret /backups/marquee-$$d.sql.gz
+            find /backups -name 'marquee-*.sql.gz' -mtime +14 -delete
+            echo "backup written: marquee-$$d.sql.gz (+ session_secret)"
+            sleep 86400
+          else
+            rm -f /backups/marquee-$$d.sql.gz.tmp
+            echo "ERROR: database dump failed (see above); retrying in 10 minutes."
+            sleep 600
+          fi
         done
     depends_on:
       postgres: { condition: service_healthy }
+      api: { condition: service_healthy }  # the api creates /data/session_secret on first start
     restart: unless-stopped
 
   # docker compose --profile tunnel up -d   (needs CLOUDFLARE_TUNNEL_TOKEN in .env)

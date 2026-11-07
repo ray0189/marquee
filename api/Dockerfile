@@ -11,7 +11,9 @@ RUN pip install -r requirements.txt
 COPY app ./app
 COPY scripts ./scripts
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
-RUN useradd -r -u 10001 marquee && mkdir /data && chown -R marquee /srv /data && chmod +x /srv/docker-entrypoint.sh
+# sed: strip CR in case the file was checked out with Windows line endings despite .gitattributes.
+RUN sed -i 's/\r$//' /srv/docker-entrypoint.sh \
+    && useradd -r -u 10001 marquee && mkdir /data && chown -R marquee /srv /data && chmod +x /srv/docker-entrypoint.sh
 VOLUME /data
 USER marquee
 

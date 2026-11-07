@@ -464,7 +464,7 @@ interface KeyInfo {
   source: string;
 }
 
-function KeyForm({ title, hint, path, which }: { title: string; hint: string; path: string; which: "torbox" | "tmdb" }) {
+function KeyForm({ title, hint, path, which, get }: { title: string; hint: string; path: string; which: "torbox" | "tmdb"; get: { url: string; how: string } }) {
   const [v, setV] = useState("");
   const [info, setInfo] = useState<KeyInfo | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
@@ -496,6 +496,13 @@ function KeyForm({ title, hint, path, which }: { title: string; hint: string; pa
         )}
       </div>
       <p className="text-sm text-bone-dim">{hint}</p>
+      <p className="text-sm text-bone-dim">
+        Get one:{" "}
+        <a href={get.url} target="_blank" rel="noreferrer noopener" className="font-medium text-amber-glow underline underline-offset-4">
+          {get.url.replace(/^https:\/\/(www\.)?/, "")}
+        </a>{" "}
+        · {get.how}
+      </p>
       <input className="input font-mono" type="password" autoComplete="off" placeholder={info?.set ? "Paste a new key to replace it" : "Paste key"} value={v} onChange={(e) => setV(e.target.value)} />
       <div className="flex items-center gap-3">
         <button className="btn-primary" disabled={v.length < 8}>Verify &amp; save</button>
@@ -576,8 +583,8 @@ function Keys() {
   return (
     <div className="grid max-w-3xl gap-5">
       <ShareUrl />
-      <KeyForm title="TorBox API key" path="/settings/torbox" which="torbox" hint="Stored encrypted on the server and never sent to a browser. Saving re-syncs the library. Rotate this if it was ever pasted anywhere." />
-      <KeyForm title="TMDB key" path="/settings/tmdb" which="tmdb" hint="Either the v3 API key or the long v4 read token. Powers posters, search and metadata." />
+      <KeyForm title="TorBox API key" path="/settings/torbox" which="torbox" hint="Stored encrypted on the server and never sent to a browser. Saving re-syncs the library. Rotate this if it was ever pasted anywhere." get={{ url: "https://torbox.app/settings", how: "sign in, then copy the API key from Settings (needs a paid plan)." }} />
+      <KeyForm title="TMDB key" path="/settings/tmdb" which="tmdb" hint="Either the v3 API key or the long v4 read token. Powers posters, search and metadata." get={{ url: "https://www.themoviedb.org/settings/api", how: "free account, then request a developer key and copy the API Key or API Read Access Token." }} />
       <AdminPassword />
     </div>
   );

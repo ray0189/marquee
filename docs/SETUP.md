@@ -17,7 +17,7 @@ Plus: [running it on a NAS](#running-it-on-a-nas-or-home-server), [updating](#up
 | | |
 |---|---|
 | **A computer that stays on** | A NAS, mini PC, old laptop, Raspberry Pi 4/5 or a cheap VPS. It needs about 2 GB of RAM and 2 GB of disk. Video isn't stored or converted here, so it doesn't need to be powerful. |
-| **Docker** | The [Docker Engine](https://docs.docker.com/engine/install/) with the compose plugin on Linux, or [Docker Desktop](https://www.docker.com/products/docker-desktop/) on Mac/Windows. Synology, QNAP, Unraid and TrueNAS have it in their app store. |
+| **Docker** | The [Docker Engine](https://docs.docker.com/engine/install/) with the compose plugin on Linux, or [Docker Desktop](https://www.docker.com/products/docker-desktop/) on Mac/Windows. Synology, QNAP, Unraid and TrueNAS have it in their app store. Windows works with Docker Desktop (Linux containers). |
 | **A TorBox account** | Any paid plan: <https://torbox.app>. Your API key is under **Settings → API**. |
 | **A TMDB API key** | Free. Create an account, then go to <https://www.themoviedb.org/settings/api> and request a developer key. Either the "API Key" or the "Read Access Token" works. |
 
@@ -239,4 +239,5 @@ docker compose up -d
 | **Admin page won't open from your phone** | Use the server's IP with port **8081**, on the same Wi-Fi. Admin is deliberately not available through the tunnel. |
 | **Want to change the admin password** | Admin → **Keys** → **Admin password**. It asks for the current one first. |
 | **Forgot the admin password** | `docker compose exec api python -m app.cli reset-admin-password`, then choose a new one on your next visit to admin. |
+| **`exec /srv/docker-entrypoint.sh: no such file or directory`** (Windows) | A clone made before line endings were pinned has Windows (CRLF) endings. Update and re-checkout, then rebuild: `git pull`, `git rm -r --cached . -q`, `git reset --hard`, `docker compose up -d --build`. New clones don't need this. |
 | **Something else** | `docker compose logs api --tail 100` usually says what's wrong. |

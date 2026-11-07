@@ -1,0 +1,6 @@
+# Check out every text file with LF endings on every OS. Shell scripts and the inline script in compose.yaml
+# run inside Linux containers, where a Windows CRLF checkout breaks them ("#!/bin/sh\r": no such file).
+* text=auto eol=lf
+*.jpg binary
+*.png binary
+*.svg text eol=lf
