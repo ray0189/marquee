@@ -2,6 +2,7 @@
 
 import math
 import re
+import unicodedata
 from dataclasses import asdict, dataclass, field
 
 VIDEO_EXT = {".mkv", ".mp4", ".m4v", ".avi", ".mov", ".webm", ".wmv", ".ts", ".m2ts", ".mpg", ".mpeg"}
@@ -166,7 +167,10 @@ _STOP = {"the", "a", "an", "of", "and", "part"}
 
 
 def _words(s: str) -> list[str]:
-    return [w for w in re.sub(r"[^a-z0-9]+", " ", s.lower()).split() if w not in _STOP]
+    # Fold accents (Léon -> leon, TÁR -> tar) and drop apostrophes (Cuckoo's -> cuckoos) before splitting.
+    s = unicodedata.normalize("NFKD", s.lower())
+    s = "".join(c for c in s if not unicodedata.combining(c)).replace("'", "").replace("\u2019", "")
+    return [w for w in re.sub(r"[^a-z0-9]+", " ", s).split() if w not in _STOP]
 
 
 def _film_match(name: str, title: str, year: int | None) -> int:
@@ -179,6 +183,35 @@ def _film_match(name: str, title: str, year: int | None) -> int:
     if year and years:
         return 3 if year in years else -1  # "The Avengers 2012" isn't "Age of Ultron 2015"
     return 2
+
+
+def _pick_film(vids: list[dict], size, title: str | None, year: int | None) -> dict | None:
+    """One film's file. A single big video is the film. In a pack, match each file's OWN name (folder names like
+    "Dark Knight Trilogy 2005-2008-2012" would match every film in it), then fall back to the one file carrying
+    the film's year (packs with translated titles). Refuse rather than play another film."""
+    films = [f for f in vids if size(f) >= 200_000_000] or vids  # extras and featurettes are small
+    if len(films) <= 1 or not title:
+        return max(vids, key=size)
+    base = lambda f: (f.get("name") or "").rsplit("/", 1)[-1]  # noqa: E731
+    scored = [(_film_match(base(f), title, year), f) for f in films]
+    best = max(scored, key=lambda t: (t[0], -abs(len(_words(base(t[1]))) - len(_words(title))), size(t[1])))
+    if best[0] > 0:
+        return best[1]
+    if year:
+        dated = [f for f in films if re.search(rf"(?<!\d){year}(?!\d)", base(f))]
+        # Several files with the year but the same title before it (1080p + 720p of one film): the biggest.
+        lead = {" ".join(_words(re.split(rf"(?<!\d){year}(?!\d)", base(f))[0])) for f in dated}
+        if len(dated) == 1 or (len(dated) > 1 and len(lead) == 1 and "" not in lead):
+            return max(dated, key=size)
+    ranked = sorted(films, key=size, reverse=True)
+    if size(ranked[0]) >= size(ranked[1]) * 5:  # a disc's main stream next to its extras
+        return ranked[0]
+    if len(ranked) <= 3 and size(ranked[1]) < size(ranked[0]) * 0.4:  # one film plus a couple of big extras
+        return ranked[0]
+    leads = {" ".join(_words(base(f))[:3]) for f in films}
+    if len(leads) == 1 and "" not in leads:  # same title on every file: versions of one film (1080p + 480p)
+        return ranked[0]
+    return None
 
 
 def pick_file(files: list[dict], season: int | None = None, episode: int | None = None,
@@ -203,12 +236,7 @@ def pick_file(files: list[dict], season: int | None = None, episode: int | None 
 
     vids = [f for f in vids if not is_sample(f)] or vids
     if season is None or episode is None:
-        features = [f for f in vids if size(f) >= biggest * 0.35]
-        if len(features) <= 1 or not title:
-            return max(vids, key=size)
-        scored = [(_film_match(f.get("name") or "", title, year), size(f), f) for f in features]
-        best = max(scored, key=lambda t: (t[0], -abs(len(_words(t[2].get("name") or "")) - len(_words(title))), t[1]))
-        return best[2] if best[0] > 0 else None
+        return _pick_film(vids, size, title, year)
     pats = [
         rf"s0*{season}(?:[ ._-]*e\d+)*[ ._-]*e0*{episode}(?!\d)",
         rf"(?<!\d)0*{season}x0*{episode}(?!\d)",

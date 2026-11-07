@@ -99,3 +99,51 @@ def test_3d_releases_are_always_blocked():
     assert is_blocked(parse("Avengers.Age.of.Ultron.2015.1080p.3D.HSBS.BluRay.x264", ""), q)
     assert is_blocked(parse("Movie.2020.Half-SBS.1080p", ""), q)
     assert not is_blocked(parse("Avengers.Age.of.Ultron.2015.1080p.BluRay.x264", ""), q)
+
+
+def test_film_pack_uses_each_files_own_name_and_year_fallback():
+    G = 10**9
+    trilogy = "BATMAN.Dark.Knight.TRILOGY.2005.2008.2012.2160p/"  # folder name matches every film in it
+    kc = [{"name": trilogy + n, "size": s * G} for n, s in
+          [("batman.begins.2005.4k-kc.mkv", 60), ("the.dark.knight.2008.4k-kc.mkv", 55), ("the.dark.knight.rises.2012.4k-kc.mkv", 65)]]
+    assert pick_file(kc, None, None, "The Dark Knight", 2008)["name"].endswith("the.dark.knight.2008.4k-kc.mkv")
+    assert pick_file(kc, None, None, "Batman Begins", 2005)["name"].endswith("batman.begins.2005.4k-kc.mkv")
+    # A small film inside a huge collection still counts (only extras under 200 MB are ignored)
+    big = [{"name": "500 Classic Movies/Blade Runner/Blade.Runner.1982.mkv", "size": 20 * G},
+           {"name": "500 Classic Movies/x/The.Dark.Knight.2008.1080p.BluRay.H264.AAC-RARBG.mp4", "size": 2.6 * G},
+           {"name": "500 Classic Movies/y/Gone.With.The.Wind.1939.mkv", "size": 7 * G}]
+    assert "Dark.Knight" in pick_file(big, None, None, "The Dark Knight", 2008)["name"]
+    # Translated titles: the one file with the film's year
+    pt = [{"name": "Trilogia/Batman - O Cavaleiro das Trevas Ressurge 1080p (2012).mkv", "size": 3.2 * G},
+          {"name": "Trilogia/Batman - O Cavaleiro das Trevas 1080p (2008).mkv", "size": 2.9 * G},
+          {"name": "Trilogia/Batman - Begins 1080p (2005).mkv", "size": 2.7 * G}]
+    assert "(2008)" in pick_file(pt, None, None, "The Dark Knight", 2008)["name"]
+    # Two translated films from the same year: can't tell, so refuse instead of guessing
+    amb = [{"name": "Marvel/Vingadores.Era.de.Ultron.2015.mkv", "size": 3 * G}, {"name": "Marvel/Homem.Formiga.2015.mkv", "size": 3 * G}]
+    assert pick_file(amb, None, None, "Avengers: Age of Ultron", 2015) is None
+    # One film plus a big extra: the film
+    one = [{"name": "Film/movie.mkv", "size": 9 * G}, {"name": "Film/extras.mkv", "size": 1 * G}]
+    assert pick_file(one, None, None, "Some Film", 2001)["name"] == "Film/movie.mkv"
+
+
+def test_film_titles_match_across_accents_apostrophes_and_versions():
+    G = 10**9
+    other = {"name": "Pack/Some.Other.Film.1994.mkv", "size": 4 * G}
+    leon = {"name": "Pack/Leon.The.Professional.1994.REMASTERED.EXTENDED.1080p.mkv", "size": 5 * G}
+    assert pick_file([other, leon], None, None, "Léon: The Professional", 1994) is leon
+    nest = {"name": "Pack/One.Flew.Over.The.Cuckoos.Nest.1975.1080p.mkv", "size": 5 * G}
+    assert pick_file([other, nest], None, None, "One Flew Over the Cuckoo's Nest", 1975) is nest
+    hi = {"name": "Marvel/Capitão.América.Guerra.Civil.2016.IMAX.1080p.mkv", "size": 3 * G}
+    lo = {"name": "Marvel/Capitão.América.Guerra.Civil.2016.IMAX.720p.mkv", "size": 1.5 * G}
+    thor = {"name": "Marvel/Thor.Ragnarok.2017.1080p.mkv", "size": 3 * G}
+    assert pick_file([hi, lo, thor], None, None, "Captain America: Civil War", 2016) is hi
+
+
+def test_one_film_in_disc_or_multi_version_releases():
+    G = 10**9
+    disc = [{"name": f"Shawshank.Complete.UHD.BluRay/BDMV/STREAM/{n}.m2ts", "size": sz} for n, sz in
+            [("00075", 63.7 * G), ("00059", 0.38 * G), ("00076", 0.38 * G), ("00077", 0.38 * G), ("00008", 0.22 * G)]]
+    assert pick_file(disc, None, None, "The Shawshank Redemption", 1994)["name"].endswith("00075.m2ts")
+    versions = [{"name": "Tumba/La tumba de las luciernagas Esp Jap lat 1080p.mkv", "size": 2.75 * G},
+                {"name": "Tumba/La tumba de las luciernagas 480P Esp-Cat-Jap.avi", "size": 2.16 * G}]
+    assert pick_file(versions, None, None, "Grave of the Fireflies", 1988)["name"].endswith("1080p.mkv")
