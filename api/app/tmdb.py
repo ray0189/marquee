@@ -49,7 +49,7 @@ def _year(date: str | None) -> int | None:
 
 def card(it: dict, media_type: str | None = None) -> dict | None:
     mt = it.get("media_type") or media_type
-    if mt not in ("movie", "tv") or "id" not in it:
+    if mt not in ("movie", "tv") or "id" not in it or it.get("adult"):
         return None
     return {
         "id": it["id"],
@@ -74,6 +74,8 @@ async def meta(media_type: str, tmdb_id: int) -> dict:
         {"append_to_response": "external_ids,credits,recommendations,content_ratings,release_dates"},
         ttl=86400,
     )
+    if d.get("adult"):
+        raise HTTPException(404, {"code": "NOT_FOUND", "message": "Not available."})
     ext = d.get("external_ids") or {}
     cert = ""
     if media_type == "movie":

@@ -8,13 +8,14 @@ import re
 import time
 from collections.abc import AsyncIterator
 
+from .adult import is_adult
 from . import indexers as ix_mod, library, settings_store as store, torbox
 from .indexers import Candidate
 from .rds import redis
 from .release import is_blocked, parse, passes, pick_file, score
 
 log = logging.getLogger("marquee.resolver")
-CACHE_VERSION = "v5"  # v3: also drop releases that say they are a different film
+CACHE_VERSION = "v6"  # v6: adult releases filtered (v3: releases that say they are a different film)
 
 # Same-name releases that announce they aren't the film the IMDb id points at, e.g. "(NOT The Chris Nolan FILM)".
 _NOT_THIS = re.compile(r"\bnot[\s._-]+the[\s._-]+[\w'.-]+(?:[\s._-]+[\w'.-]+){0,3}?[\s._-]+(?:film|movie)\b", re.I)
@@ -99,6 +100,7 @@ async def resolve(meta: dict, season: int | None, episode: int | None, ip: str) 
     pool: dict[str, Candidate] = {}
     for c in await library.match(meta["title"], meta.get("year"), mt, season, episode):
         pool[c.hash] = c
+    title = meta["title"]
     if pool and mt != "movie":  # a film's name-only library hits wait for an indexer to confirm them
         items, hidden = rank(pool, q)
         yield {"type": "streams", "final": False, "items": items, "hidden": hidden}
@@ -122,6 +124,8 @@ async def resolve(meta: dict, season: int | None, episode: int | None, ip: str) 
             failed_all = failed_all and err is not None
             answered = answered or bool(res)
             for c in res:
+                if is_adult(f"{c.title} {c.filename}", title):  # never list adult releases
+                    continue
                 if c.hash in pool:
                     pool[c.hash].merge(c)
                 else:

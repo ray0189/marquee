@@ -8,6 +8,7 @@ import time
 from . import torbox
 from .indexers import Candidate
 from .rds import redis
+from .adult import is_adult
 from .release import is_video, pick_file
 
 
@@ -92,7 +93,7 @@ async def match(title: str, year: int | None, media_type: str, season: int | Non
             if year and not any(str(y) in name.split() for y in (year - 1, year, year + 1)):
                 continue
         item = await item_by_hash(h)
-        if not item:
+        if not item or is_adult(item["name"], title):  # porn parodies reuse real titles and years
             continue
         if media_type == "tv" and not pick_file(item["files"], season, episode):
             continue

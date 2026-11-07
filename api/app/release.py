@@ -5,6 +5,8 @@ import re
 import unicodedata
 from dataclasses import asdict, dataclass, field
 
+from .adult import is_adult
+
 VIDEO_EXT = {".mkv", ".mp4", ".m4v", ".avi", ".mov", ".webm", ".wmv", ".ts", ".m2ts", ".mpg", ".mpeg"}
 _EXT_RE = re.compile(r"\.(mkv|mp4|m4v|avi|mov|webm|wmv|m2ts|ts|mpg|mpeg)$", re.I)
 
@@ -235,6 +237,9 @@ def pick_file(files: list[dict], season: int | None = None, episode: int | None 
         return bool(re.search(r"(?<![a-z0-9])sample(?![a-z0-9])", parts[-1])) and size(f) < biggest * 0.1
 
     vids = [f for f in vids if not is_sample(f)] or vids
+    vids = [f for f in vids if not is_adult(f.get("name") or "", title or "")]  # porn parodies inside packs
+    if not vids:
+        return None
     if season is None or episode is None:
         return _pick_film(vids, size, title, year)
     pats = [

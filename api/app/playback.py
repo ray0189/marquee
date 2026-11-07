@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 
+from .adult import is_adult
 from . import library, security, settings_store as store, torbox
 from .rds import redis
 from .release import parse, pick_file
@@ -37,6 +38,8 @@ async def locate(info_hash: str, season: int | None, episode: int | None, film: 
         item = await library.put_item(full or {})
         if not item:
             raise _err(409, "DOWNLOADING", "TorBox is still downloading this one. Try again shortly.")
+    if is_adult(item.get("name") or "", (film or ("", None))[0]):
+        raise _err(404, "NOT_THIS_FILM", "This release isn't the film. Pick another source.")
     f = pick_file(item["files"], season, episode, *(film or (None, None)))
     if not f:
         what = f"S{season:02d}E{episode:02d}" if season is not None and episode is not None else "a video file"
