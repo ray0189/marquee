@@ -51,6 +51,11 @@ No configuration is needed to start. Then:
 
 Friends open their link at port **8080**. Admin is only on port **8081**, so keep that port on your own network.
 
+> **The admin panel is local-only.** It runs on its own port (**8081**) and is never served through the public
+> site or a Cloudflare Tunnel: `/admin` returns 404 there. Only someone on the same network as the server (in
+> practice, the person who set it up) can open it, and they also need the admin password. Friends with invite
+> links can watch, but can't see or change keys, links, sources or settings.
+
 ## Deploy to a NAS or server over SSH
 
 From a computer with this folder, deploy to any Linux box running Docker that you can reach by SSH key:

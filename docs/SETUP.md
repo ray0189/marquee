@@ -64,6 +64,12 @@ Open the admin panel **on the machine itself, or another device on the same netw
 - On the same machine: <http://localhost:8081>
 - From another device: `http://<the machine's IP>:8081`, e.g. `http://192.168.1.50:8081`
 
+
+> **The admin panel is local-only.** It runs on its own port (**8081**) and is never served through the public
+> site or a Cloudflare Tunnel: `/admin` returns 404 there. Only someone on the same network as the server (in
+> practice, the person who set it up) can open it, and they also need the admin password. Friends with invite
+> links can watch, but can't see or change keys, links, sources or settings.
+
 Then:
 
 1. **Choose an admin password.** The first visit asks for one.
