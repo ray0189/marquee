@@ -3,7 +3,7 @@ import json
 import time
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,11 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import devices as devs, library, limiter, search, settings_store as store, torbox
 from ..config import cfg
 from ..db import get_db
-from ..deps import require_admin
+from ..deps import _admin_fail, require_admin
 from ..http import client
 from ..models import Device, Link, iso
 from ..rds import redis
-from ..security import decrypt, encrypt, hash_token, new_token
+from ..security import check_password, decrypt, encrypt, hash_password, hash_token, new_token
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
@@ -235,6 +235,29 @@ async def set_tmdb_key(body: KeyBody):
     if r.status_code != 200:
         raise HTTPException(422, {"code": "TMDB_KEY", "message": "TMDB rejected this key"})
     await store.put("tmdb_key", key, secret=True)
+    return {"ok": True}
+
+
+class PasswordChange(BaseModel):
+    current: str = Field(max_length=200)
+    new: str = Field(min_length=10, max_length=200)
+
+
+@router.put("/settings/password")
+async def change_password(body: PasswordChange, request: Request):
+    """Change the admin password. Asks for the current one again, so an unlocked tab left open can't be used to
+    take the panel over."""
+    if cfg.cf_access_team and cfg.cf_access_aud:
+        raise HTTPException(409, {"code": "ACCESS_MODE", "message": "Sign-in is handled by Cloudflare Access, so there's no password to change."})
+    if cfg.admin_token:
+        raise HTTPException(409, {"code": "ENV_TOKEN", "message": "The password comes from ADMIN_TOKEN in .env. Change it there and restart."})
+    stored = await store.get("admin_password")
+    if not stored or not await check_password(body.current, stored):
+        await _admin_fail(request)  # counts toward the same lockout as the sign-in form
+        raise HTTPException(422, {"code": "WRONG_PASSWORD", "message": "Your current password is wrong."})
+    if body.new == body.current:
+        raise HTTPException(422, {"code": "SAME_PASSWORD", "message": "Choose a different password."})
+    await store.put("admin_password", hash_password(body.new))
     return {"ok": True}
 
 

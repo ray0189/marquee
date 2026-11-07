@@ -237,5 +237,6 @@ docker compose up -d
 | **Plays but no sound, or the wrong language** | Use the player's audio button. Every track in the file is listed. |
 | **Cloudflare shows error 502/1033** | The connector isn't running or can't see `web`. Check `docker compose logs cloudflared` and that the hostname's service is `http://web:80`. |
 | **Admin page won't open from your phone** | Use the server's IP with port **8081**, on the same Wi-Fi. Admin is deliberately not available through the tunnel. |
+| **Want to change the admin password** | Admin → **Keys** → **Admin password**. It asks for the current one first. |
 | **Forgot the admin password** | `docker compose exec api python -m app.cli reset-admin-password`, then choose a new one on your next visit to admin. |
 | **Something else** | `docker compose logs api --tail 100` usually says what's wrong. |

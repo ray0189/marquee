@@ -535,12 +535,50 @@ function ShareUrl() {
   );
 }
 
+function AdminPassword() {
+  const [cur, setCur] = useState("");
+  const [next, setNext] = useState("");
+  const [again, setAgain] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const mismatch = again.length > 0 && next !== again;
+  return (
+    <form
+      className="card space-y-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        try {
+          await adminSend("PUT", "/settings/password", { current: cur, new: next });
+          adminToken.set(next); // this tab stays unlocked with the new password
+          setMsg({ ok: true, t: "Password changed. Use the new one next time you sign in." });
+          setCur("");
+          setNext("");
+          setAgain("");
+        } catch (err) {
+          setMsg({ ok: false, t: (err as Error).message });
+        }
+      }}
+    >
+      <div className="font-display text-xl font-semibold">Admin password</div>
+      <p className="text-sm text-bone-dim">At least 10 characters. Friends' invite links are not affected.</p>
+      <input className="input" type="password" autoComplete="current-password" placeholder="Current password" value={cur} onChange={(e) => setCur(e.target.value)} />
+      <input className="input" type="password" autoComplete="new-password" placeholder="New password" value={next} onChange={(e) => setNext(e.target.value)} />
+      <input className="input" type="password" autoComplete="new-password" placeholder="New password again" value={again} onChange={(e) => setAgain(e.target.value)} />
+      <div className="flex items-center gap-3">
+        <button className="btn-primary" disabled={!cur || next.length < 10 || next !== again}>Change password</button>
+        {mismatch && <span className="text-sm text-ember">The new passwords don't match.</span>}
+        {msg && !mismatch && <span className={`text-sm ${msg.ok ? "text-moss" : "text-ember"}`}>{msg.t}</span>}
+      </div>
+    </form>
+  );
+}
+
 function Keys() {
   return (
     <div className="grid max-w-3xl gap-5">
       <ShareUrl />
       <KeyForm title="TorBox API key" path="/settings/torbox" which="torbox" hint="Stored encrypted on the server and never sent to a browser. Saving re-syncs the library. Rotate this if it was ever pasted anywhere." />
       <KeyForm title="TMDB key" path="/settings/tmdb" which="tmdb" hint="Either the v3 API key or the long v4 read token. Powers posters, search and metadata." />
+      <AdminPassword />
     </div>
   );
 }
