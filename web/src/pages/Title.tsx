@@ -8,6 +8,7 @@ import { StreamList } from "../components/StreamList";
 import { fmtRuntime, fmtTime } from "../lib/format";
 import { useStreams } from "../lib/useStreams";
 import type { Episode, HistoryItem, MediaType, Meta, StreamItem } from "../types";
+import { fadeIn } from "../lib/fade";
 
 export default function Title() {
   const { type, id } = useParams();
@@ -61,11 +62,11 @@ export default function Title() {
   return (
     <div className="animate-fade">
       <section className="relative isolate min-h-[540px] overflow-hidden">
-        <img src={img(meta.backdrop, "w1280")} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover object-top" />
+        <img data-fade onLoad={fadeIn} src={img(meta.backdrop, "w1280")} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover object-top" />
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink-950 via-ink-950/60 to-ink-950/20" />
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-ink-950/90 via-ink-950/30 to-transparent" />
         <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 pb-8 pt-64 md:flex-row md:items-end md:px-10 md:pt-44">
-          <img src={img(meta.poster, "w500")} alt="" className="hidden w-52 shrink-0 rounded-2xl shadow-lift ring-1 ring-white/10 md:block lg:w-60" />
+          <img data-fade onLoad={fadeIn} src={img(meta.poster, "w500")} alt="" className="hidden w-52 shrink-0 rounded-2xl shadow-lift ring-1 ring-white/10 md:block lg:w-60" />
           <div className="max-w-3xl">
             <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-bone-dim">
               <span className="font-semibold text-bone">{mt === "tv" ? "Series" : "Film"}</span>
@@ -126,7 +127,7 @@ export default function Title() {
                     className={`group flex gap-3 rounded-2xl p-2.5 text-left transition active:scale-[.99] ${epNo === e.number ? "bg-white/[0.12] ring-1 ring-white/30" : "bg-white/[0.04] hover:bg-white/[0.08]"}`}
                   >
                     <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-xl bg-ink-700 sm:w-40">
-                      {e.still && <img src={img(e.still, "w342")} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
+                      {e.still && <img data-fade onLoad={fadeIn} src={img(e.still, "w342")} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
                       <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 text-[11px] font-bold">{e.number}</span>
                     </div>
                     <div className="min-w-0 py-0.5">
@@ -157,7 +158,7 @@ export default function Title() {
             <div className="no-scrollbar flex gap-5 overflow-x-auto pb-2">
               {meta.cast.map((c) => (
                 <div key={c.name + c.character} className="w-24 shrink-0 text-center">
-                  <div className="mx-auto h-20 w-20 overflow-hidden rounded-full bg-ink-700 ring-1 ring-white/10">{c.photo && <img src={img(c.photo, "w185")} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
+                  <div className="mx-auto h-20 w-20 overflow-hidden rounded-full bg-ink-700 ring-1 ring-white/10">{c.photo && <img data-fade onLoad={fadeIn} src={img(c.photo, "w185")} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
                   <div className="mt-2 truncate text-xs font-medium">{c.name}</div>
                   <div className="truncate text-[11px] text-bone-mute">{c.character}</div>
                 </div>

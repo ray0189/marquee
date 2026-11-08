@@ -18,13 +18,24 @@ export default {
         lift: "0 18px 50px -12px rgba(0,0,0,.8)",
         glow: "0 0 0 1px rgba(255,255,255,.35), 0 14px 40px -10px rgba(0,0,0,.9)",
       },
+      // One motion language: quick to start, long soft landing. Only opacity/transform are animated.
+      transitionTimingFunction: { DEFAULT: "cubic-bezier(.22,1,.36,1)", "out-expo": "cubic-bezier(.16,1,.3,1)" },
+      transitionDuration: { DEFAULT: "220ms" },
       keyframes: {
         shimmer: { "100%": { transform: "translateX(100%)" } },
-        rise: { from: { opacity: 0, transform: "translateY(10px)" }, to: { opacity: 1, transform: "none" } },
+        rise: { from: { opacity: 0, transform: "translateY(12px)" }, to: { opacity: 1, transform: "none" } },
         fade: { from: { opacity: 0 }, to: { opacity: 1 } },
+        pop: { from: { opacity: 0, transform: "translateY(6px) scale(.98)" }, to: { opacity: 1, transform: "none" } },
         bulb: { "0%,100%": { opacity: 0.35 }, "50%": { opacity: 1 } },
       },
-      animation: { shimmer: "shimmer 1.6s infinite", rise: "rise .5s ease both", fade: "fade .6s ease both", bulb: "bulb 2.4s ease-in-out infinite" },
+      animation: {
+        shimmer: "shimmer 1.6s infinite",
+        rise: "rise .65s cubic-bezier(.16,1,.3,1) both",
+        fade: "fade .45s cubic-bezier(.22,1,.36,1) both",
+        page: "fade .35s cubic-bezier(.22,1,.36,1) both", // opacity only: a transform would break fixed children
+        pop: "pop .35s cubic-bezier(.16,1,.3,1) both",
+        bulb: "bulb 2.4s ease-in-out infinite",
+      },
     },
   },
   plugins: [],

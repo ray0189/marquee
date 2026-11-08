@@ -102,7 +102,7 @@ body {
 }
 .animate-kenburns { animation: kenburns 14s ease-out forwards; }
 @media (prefers-reduced-motion: reduce) {
-  .animate-kenburns, .animate-rise, .animate-fade { animation: none !important; }
+  .animate-kenburns, .animate-rise, .animate-fade, .animate-page, .animate-pop { animation: none !important; }
 }
 
 /* Phones and tablets: live blur behind translucent bars/panels is the main cause of janky scrolling and
@@ -149,4 +149,33 @@ input.volume::-moz-range-thumb {
   border: 0;
   border-radius: 9999px;
   background: #fff;
+}
+
+/* Images fade in once decoded instead of popping in (main.tsx marks them loaded). */
+img[data-fade] {
+  opacity: 0;
+  transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+img[data-fade][data-loaded] {
+  opacity: 1;
+}
+
+/* Rows ease in as they scroll into view, on the compositor; browsers without scroll-driven animations
+   (and people who turn motion off) just see the row. */
+@keyframes row-reveal {
+  from { opacity: 0; translate: 0 28px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .row-reveal {
+      animation: row-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  img[data-fade] { opacity: 1; transition: none; }
 }

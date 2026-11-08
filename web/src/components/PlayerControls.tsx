@@ -380,7 +380,7 @@ export function PlayerControls(p: Props) {
 
       {/* side panel */}
       <div
-        className={`absolute inset-y-0 right-0 z-40 sheet flex w-[min(320px,80%)] flex-col bg-ink-950/90 backdrop-blur-xl transition-transform duration-300 ${panel ? "translate-x-0" : "pointer-events-none translate-x-full"}`}
+        className={`absolute inset-y-0 right-0 z-40 sheet flex w-[min(320px,80%)] flex-col bg-ink-950/90 backdrop-blur-xl transition-transform duration-500 ease-out-expo ${panel ? "translate-x-0" : "pointer-events-none translate-x-full"}`}
       >
         <div className="flex items-center justify-between px-5 pb-2 pt-5">
           <h4 className="text-sm font-semibold text-bone">{panel === "audio" ? "Audio" : panel === "subs" ? "Subtitles" : panel === "info" ? "Playback info" : "Playback speed"}</h4>

@@ -123,7 +123,7 @@ export default function Watch() {
         )}
 
         <aside
-          className={`safe-t absolute inset-y-0 right-0 z-50 sheet flex w-[min(460px,100%)] flex-col bg-ink-950/95 shadow-lift ring-1 ring-white/5 backdrop-blur-xl transition-transform duration-300 ${drawer ? "translate-x-0" : "pointer-events-none translate-x-full"}`}
+          className={`safe-t absolute inset-y-0 right-0 z-50 sheet flex w-[min(460px,100%)] flex-col bg-ink-950/95 shadow-lift ring-1 ring-white/5 backdrop-blur-xl transition-transform duration-500 ease-out-expo ${drawer ? "translate-x-0" : "pointer-events-none translate-x-full"}`}
         >
           <div className="flex items-center justify-between px-5 pb-3 pt-5">
             <div className="min-w-0">

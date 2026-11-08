@@ -52,7 +52,13 @@ function Protected() {
   return (
     <>
       {!pathname.startsWith("/watch") && <Nav label={label} />}
-      <Outlet />
+      {pathname.startsWith("/watch") ? (
+        <Outlet />
+      ) : (
+        <div key={pathname} className="animate-page">
+          <Outlet />
+        </div>
+      )}
     </>
   );
 }

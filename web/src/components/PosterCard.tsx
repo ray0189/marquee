@@ -3,15 +3,16 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { img } from "../api";
 import type { Card } from "../types";
+import { fadeIn } from "../lib/fade";
 
 export function PosterCard({ item, className = "" }: { item: Card; className?: string }) {
   const src = img(item.poster, "w342");
   const [bad, setBad] = useState(false);
   return (
     <Link to={`/title/${item.type}/${item.id}`} className={`group block shrink-0 snap-start outline-none ${className}`} title={item.title}>
-      <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-ink-800 ring-1 ring-white/[0.07] transition duration-300 group-hover:scale-[1.035] group-hover:shadow-glow group-focus-visible:shadow-glow group-active:scale-[.98]">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-ink-800 ring-1 ring-white/[0.07] transition duration-500 ease-out-expo group-hover:scale-[1.035] group-hover:shadow-glow group-focus-visible:shadow-glow group-active:scale-[.98]">
         {src && !bad ? (
-          <img src={src} alt="" loading="lazy" decoding="async" onError={() => setBad(true)} className="h-full w-full object-cover" />
+          <img data-fade onLoad={fadeIn} src={src} alt="" loading="lazy" decoding="async" onError={() => setBad(true)} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-ink-700 to-ink-900 p-3 text-center">
             <span className="text-sm font-bold leading-tight text-bone-dim">{item.title}</span>

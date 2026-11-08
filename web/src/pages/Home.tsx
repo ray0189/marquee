@@ -6,6 +6,7 @@ import { PosterCard, PosterSkeleton } from "../components/PosterCard";
 import { Row } from "../components/Row";
 import { epLabel, fmtTime } from "../lib/format";
 import type { Card, HistoryItem } from "../types";
+import { fadeIn } from "../lib/fade";
 
 interface HomeData {
   hero: Card[];
@@ -17,8 +18,8 @@ function ContinueCard({ h }: { h: HistoryItem }) {
   const href = h.type === "tv" ? `/watch/tv/${h.id}?s=${h.season}&e=${h.episode}` : `/watch/movie/${h.id}`;
   return (
     <Link to={href} className="group block w-64 shrink-0 snap-start md:w-80">
-      <div className="relative aspect-video overflow-hidden rounded-2xl bg-ink-800 ring-1 ring-white/[0.07] transition duration-300 group-hover:scale-[1.03] group-hover:shadow-glow group-active:scale-[.98]">
-        <img src={img(h.backdrop ?? h.poster, "w500")} alt="" loading="lazy" className="h-full w-full object-cover" />
+      <div className="relative aspect-video overflow-hidden rounded-2xl bg-ink-800 ring-1 ring-white/[0.07] transition duration-500 ease-out-expo group-hover:scale-[1.03] group-hover:shadow-glow group-active:scale-[.98]">
+        <img data-fade onLoad={fadeIn} src={img(h.backdrop ?? h.poster, "w500")} alt="" loading="lazy" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
         <span className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-black shadow-lift">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>

@@ -6,7 +6,7 @@ export function Row({ title, children, more }: { title: string; children: ReactN
   const ref = useRef<HTMLDivElement>(null);
   const scroll = (dir: -1 | 1) => ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.85, behavior: "smooth" });
   return (
-    <section className="group/row row-cv relative">
+    <section className="group/row row-cv row-reveal relative">
       <div className="mb-2.5 flex items-center justify-between px-5 md:px-10">
         <h2 className="text-lg font-bold tracking-tight md:text-[22px]">{title}</h2>
         {more && (
