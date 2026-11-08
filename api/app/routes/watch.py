@@ -390,6 +390,29 @@ async def title_history(media_type: MediaType, tmdb_id: int, link: LinkInfo = De
     return _hist(row) if row else None
 
 
+# --- playback diagnostics -----------------------------------------------------------------
+
+
+class StallReport(BaseModel):
+    mode: str = Field(max_length=12)
+    secs: float = Field(ge=0, le=600)
+    at: float = Field(ge=0, le=100000)
+    ahead: float = Field(ge=-1, le=100000)
+    ready: int = Field(ge=0, le=4)
+    net: int = Field(ge=0, le=3)
+    boost: bool = False
+    ctx: str = Field("", max_length=12)
+    nudged: int = Field(0, ge=0, le=1000)
+    ua: str = Field("", max_length=40)
+
+
+@router.post("/diag/stall")
+async def stall(body: StallReport, link: LinkInfo = Depends(require_link)):
+    """A viewer's player froze: one log line to find the cause (nothing is stored)."""
+    log.warning("stall link=%s %s", link.id, body.model_dump_json())
+    return {"ok": True}
+
+
 # --- media proxy ---------------------------------------------------------------------------
 
 

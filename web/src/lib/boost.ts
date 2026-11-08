@@ -60,3 +60,11 @@ export function wakeBoost(video: HTMLMediaElement): void {
   const g = graphs.get(video);
   if (g && g.ctx.state === "suspended") void g.ctx.resume();
 }
+
+/** For diagnostics: is this video's sound running through the boost, and what state is its audio engine in? */
+export function boostOn(video: HTMLMediaElement): boolean {
+  return graphs.has(video);
+}
+export function boostState(video: HTMLMediaElement): string {
+  return graphs.get(video)?.ctx.state ?? "";
+}

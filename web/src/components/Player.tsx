@@ -7,7 +7,7 @@ import { api, ApiError, img, post, sessionHeaders, withSession } from "../api";
 import { isSafari, playPath } from "../lib/compat";
 import { device } from "../lib/device";
 import { epLabel, fmtSize } from "../lib/format";
-import { wakeBoost } from "../lib/boost";
+import { boostOn, boostState, wakeBoost } from "../lib/boost";
 import { HlsWarmer } from "../lib/hlsWarm";
 import { planFile, type Plan, type Stage } from "../lib/plan";
 import { audioScore, RemuxSession, remuxSupported, warmRemux } from "../lib/remux";
@@ -89,6 +89,9 @@ export function Player(p: Props) {
   const progressed = useRef(false); // this element has really played (not just loaded)
   const audioChecked = useRef(false);
   const stallTimer = useRef<number>();
+  const stallStart = useRef(0);
+  const stallInfo = useRef<{ ahead: number; ready: number; net: number } | null>(null);
+  const nudges = useRef(0);
   const startedAtPos = useRef(0);
   const placeNow = () => (lastPos.current > 1 ? lastPos.current : 0) || player.current?.currentTime || resumeAt.current;
   const resumed = useRef(false);
@@ -419,19 +422,42 @@ export function Player(p: Props) {
               // Stuck "loading" with video already buffered right ahead: wake a suspended audio engine (volume
               // boost) and nudge the playhead past whatever boundary the decoder is stuck on.
               window.clearTimeout(stallTimer.current);
+              const vw = document.querySelector("video");
+              if (vw && !stallStart.current) {
+                stallStart.current = performance.now();
+                let ahead = 0;
+                for (let i = 0; i < vw.buffered.length; i++) if (vw.currentTime >= vw.buffered.start(i) - 0.1 && vw.currentTime <= vw.buffered.end(i)) ahead = vw.buffered.end(i) - vw.currentTime;
+                stallInfo.current = { ahead, ready: vw.readyState, net: vw.networkState };
+              }
               stallTimer.current = window.setTimeout(() => {
                 const v = document.querySelector("video");
                 if (!v || v.paused || v.seeking) return;
                 let ahead = 0;
                 for (let i = 0; i < v.buffered.length; i++) if (v.currentTime >= v.buffered.start(i) - 0.1 && v.currentTime <= v.buffered.end(i)) ahead = v.buffered.end(i) - v.currentTime;
                 if (ahead > 3 && v.readyState < 3) {
+                  nudges.current++;
                   console.warn("[marquee] stalled with", ahead.toFixed(0), "s buffered: nudging");
                   wakeBoost(v);
                   v.currentTime = v.currentTime + 0.05;
                 }
               }, 3000);
             }}
-            onPlaying={() => window.clearTimeout(stallTimer.current)}
+            onPlaying={() => {
+              window.clearTimeout(stallTimer.current);
+              // Report freezes over 1.5 s (mode, buffer state, boost) so their cause can be found in the server log.
+              const secs = stallStart.current ? (performance.now() - stallStart.current) / 1000 : 0;
+              stallStart.current = 0;
+              const v = document.querySelector("video");
+              if (secs > 1.5 && v && stallInfo.current && progressed.current) {
+                const body = JSON.stringify({
+                  mode: ready.mode, secs: +secs.toFixed(1), at: +v.currentTime.toFixed(1), ahead: +stallInfo.current.ahead.toFixed(1),
+                  ready: stallInfo.current.ready, net: stallInfo.current.net, boost: boostOn(v), ctx: boostState(v), nudged: nudges.current,
+                  ua: device().label.slice(0, 40),
+                });
+                nudges.current = 0;
+                void fetch("/api/diag/stall", { method: "POST", headers: { "content-type": "application/json", ...sessionHeaders() }, body, keepalive: true }).catch(() => undefined);
+              }
+            }}
             onVolumeChange={(detail) => {
               if (!detail.muted) setSoundBlocked(false);
             }}
