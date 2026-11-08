@@ -166,8 +166,7 @@ def browser_friendly(rel: Release) -> bool:
         return False
     if rel.resolution > 1080 or "DV" in rel.hdr:
         return False
-    audio = {a for a in rel.audio if a != "atmos"}
-    return not audio or bool(audio & {"aac", "ac3", "eac3", "opus", "flac", "mp3"})
+    return True  # any common audio works: AC-3, DTS and TrueHD are decoded on the device
 
 
 def is_video(f: dict) -> bool:

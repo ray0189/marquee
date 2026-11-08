@@ -73,7 +73,7 @@ export function canDirectPlay(r: Release): Verdict {
 /**
  * Could the device repackage this file itself (see remux.ts)? That removes the container and audio limits
  * without any server work: video must be decodable as-is, and at least one audio track must be something we can
- * copy or convert (DTS and TrueHD can't be).
+ * copy or convert (DTS and TrueHD included: they are decoded on the device).
  */
 export function remuxLikely(r: Release): boolean {
   const dv = d();
@@ -83,7 +83,7 @@ export function remuxLikely(r: Release): boolean {
   if (r.codec === "hevc" && !dv.hevc) return false;
   if (r.codec === "av1" && !dv.av1) return false;
   if (r.hdr.includes("DV") && dv.browser !== "safari") return false;
-  if (r.audio.length && r.audio.every((a) => ["dts", "dtshd", "dtsx", "truehd"].includes(a))) return false;
+  // DTS and TrueHD are decoded on the device now (see remux.ts), so they no longer rule the remux out.
   return true;
 }
 

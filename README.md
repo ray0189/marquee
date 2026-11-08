@@ -130,15 +130,23 @@ The database schema updates itself on start.
 
 ## How playback works
 
-1. **Direct play.** The browser plays the file straight from TorBox when the container, video and audio are all
-   supported natively.
-2. **Browser remux** (`web/src/lib/remux.ts`). The browser reads the file with range requests, copies the video
-   untouched into fragmented MP4 and feeds it to the player through Media Source Extensions. Audio is copied, or
-   converted locally (AC-3/E-AC-3 to AAC or FLAC). No server CPU is used and any audio track can be picked.
-3. **TorBox transcode.** The last resort, for DTS/TrueHD-only files or video the device can't decode.
+Four layers; each film uses the first one that works on the viewer's device:
 
-If a method fails mid-play, the player steps down to the next one at the same position. If TorBox's download link
-contains your account key, the file is relayed through your server instead, so the key never reaches a browser.
+1. **Direct play.** The browser plays the file as-is (container, video and audio all native). Files whose name
+   says so start at once, without reading the file first.
+2. **Browser remux, audio copied.** The browser reads the file with range requests, copies the video untouched
+   into fragmented MP4 and feeds it to the player through Media Source Extensions.
+3. **Browser remux, audio decoded on the device.** Same, but the audio is decoded in the browser
+   (Dolby Digital AC-3/E-AC-3, **DTS** and **Dolby TrueHD**, via WebAssembly decoders that are only downloaded
+   when a film needs them) and re-encoded to AAC or FLAC; 7.1 is mixed down to stereo. Video and audio run in
+   separate lanes with their own buffers, so the copied video never waits for the audio, and switching audio
+   language only restarts the sound. Blu-ray (open-GOP) encodes are copied with the file's own key frames, so
+   chunks arrive every second and seeks start at the nearest key frame instead of the beginning.
+4. **TorBox transcode.** The last resort: Dolby Vision on non-Apple devices, or video the device can't decode.
+
+If a layer fails mid-play, the player steps down to the next one at the same second. Sources are ranked per
+device so files that play without layer 4 come first. If TorBox's download link embeds your account key (it
+does), the file is relayed through your server instead, so the key never reaches a browser.
 
 ## Development
 

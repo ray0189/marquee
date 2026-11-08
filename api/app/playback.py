@@ -73,10 +73,9 @@ def _warm(coro) -> None:
 
 
 def _likely_transcode(hints: dict) -> bool:
-    audio = set(hints.get("audio") or [])
-    hard = {"dts", "dtshd", "dtsx", "truehd"}
-    easy = {"aac", "ac3", "eac3", "ddp", "opus", "mp3", "flac"}
-    return bool(audio & hard and not audio & easy) or "DV" in (hints.get("hdr") or [])
+    # DTS and TrueHD are decoded on the viewer's device now, so only Dolby Vision (non-Apple) still lands on
+    # TorBox's transcode often enough to be worth starting early.
+    return "DV" in (hints.get("hdr") or [])
 
 
 def _short(name: str) -> str:

@@ -8,7 +8,7 @@ import { RemuxSession, RemuxUnsupported, remuxSupported } from "./remux";
  *
  *   direct  the browser plays the CDN file as-is (container, video and the audio track are all native here)
  *   remux   the browser repackages it live (video copied, audio copied or converted, any language switchable)
- *   hls     TorBox transcodes it (last resort: DTS/TrueHD-only files, Dolby Vision on non-Apple, unreadable files)
+ *   hls     TorBox transcodes it (last resort: Dolby Vision on non-Apple, video the device cannot decode, unreadable files)
  */
 
 export type Stage = "direct" | "remux" | "hls";
