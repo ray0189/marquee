@@ -56,6 +56,29 @@ def _mime(name: str) -> str:
     )
 
 
+_warming: set[asyncio.Task] = set()
+
+
+def _warm(coro) -> None:
+    """Fire-and-forget that keeps a reference (so it isn't garbage-collected) and never surfaces errors."""
+    async def run():
+        try:
+            await coro
+        except Exception:  # noqa: BLE001  (the player asks again for real and gets a proper error then)
+            pass
+
+    t = asyncio.create_task(run())
+    _warming.add(t)
+    t.add_done_callback(_warming.discard)
+
+
+def _likely_transcode(hints: dict) -> bool:
+    audio = set(hints.get("audio") or [])
+    hard = {"dts", "dtshd", "dtsx", "truehd"}
+    easy = {"aac", "ac3", "eac3", "ddp", "opus", "mp3", "flac"}
+    return bool(audio & hard and not audio & easy) or "DV" in (hints.get("hdr") or [])
+
+
 def _short(name: str) -> str:
     return name.rsplit("/", 1)[-1]
 
@@ -74,6 +97,12 @@ async def play(
     item, f = await locate(info_hash, season, episode, film)
     hints = parse(_short(f["name"]), item["name"]).to_dict()
     base = {"file": {"name": _short(f["name"]), "size": f["size"]}, "hints": hints, "mode": mode}
+
+    if mode == "direct" and _likely_transcode(hints):
+        # The player will probably end up asking for TorBox's transcode (browsers can't play DTS/TrueHD-only
+        # audio or, outside Safari, Dolby Vision). Start it now so it's ready when the player switches,
+        # instead of only after the player has tried the file and given up.
+        _warm(play(info_hash, season, episode, "hls", ip, None, None, link_id, film))
 
     if mode == "direct":
         # TorBox's CDN links can embed the account key. Such a link never reaches a browser: the file is

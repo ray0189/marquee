@@ -52,6 +52,8 @@ export function Player(p: Props) {
   const [status, setStatus] = useState("Finding the fastest route…");
   const [error, setError] = useState<string | null>(null);
   const [subs, setSubs] = useState<SubtitleTrack[]>([]);
+  const [subShift, setSubShift] = useState(0); // seconds; positive shows subtitles later
+  const [subPick, setSubPick] = useState<string | null>(null); // label of the chosen track, kept across shifts
   const [audio, setAudio] = useState<number | null>(null);
   const [showNext, setShowNext] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
@@ -304,12 +306,15 @@ export function Player(p: Props) {
     if (i >= 0 && i !== cur && player.current?.audioTracks[i]) player.current.audioTracks[i].selected = true;
   };
 
-  // External subtitles
+  // External subtitles, ranked for the file actually playing (same release group/source/cut stay in sync)
+  const fileName = ready?.file?.name ?? "";
   useEffect(() => {
     setSubs([]);
-    const qs = p.type === "tv" ? `?season=${p.season}&episode=${p.episode}` : "";
-    api<SubtitleTrack[]>(`/api/subtitles/${p.type}/${p.id}${qs}`).then(setSubs).catch(() => undefined);
-  }, [p.type, p.id, p.season, p.episode]);
+    setSubShift(0);
+    const qs = new URLSearchParams(p.type === "tv" ? { season: String(p.season), episode: String(p.episode) } : {});
+    if (fileName) qs.set("file", fileName);
+    api<SubtitleTrack[]>(`/api/subtitles/${p.type}/${p.id}?${qs}`).then(setSubs).catch(() => undefined);
+  }, [p.type, p.id, p.season, p.episode, fileName]);
 
   // Save position every 15s, when hidden, and on exit.
   const save = useCallback(() => {
@@ -422,10 +427,20 @@ export function Player(p: Props) {
           >
             <MediaProvider>
               {subs.map((s) => (
-                <Track key={s.id} src={withSession(s.url)} kind="subtitles" label={s.label} lang={s.lang} />
+                <Track
+                  key={`${s.id}:${subShift}`}
+                  src={withSession(subShift ? `${s.url}&shift=${subShift}` : s.url)}
+                  kind="subtitles"
+                  label={s.label}
+                  lang={s.lang}
+                  default={s.label === subPick}
+                />
               ))}
             </MediaProvider>
             <PlayerControls
+              subShift={subShift}
+              onSubShift={setSubShift}
+              onSubPick={setSubPick}
               player={player}
               title={p.title}
               subtitle={p.type === "tv" && p.season != null && p.episode != null ? epLabel(p.season, p.episode) : undefined}

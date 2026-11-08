@@ -27,6 +27,9 @@ interface Props {
   notice?: ReactNode; // a quiet message under the top bar
   info?: ReactNode; // contents of the info panel (method, file, device)
   actions?: ReactNode; // top-right buttons, e.g. Sources
+  subShift?: number; // subtitle timing offset in seconds
+  onSubShift?: (s: number) => void;
+  onSubPick?: (label: string | null) => void;
   cast?: Omit<CastMedia, "time"> | null; // what a TV can fetch itself (never the in-browser remux)
   onBack: () => void;
 }
@@ -421,12 +424,38 @@ export function PlayerControls(p: Props) {
                 {a.label}
               </Row>
             ))}
-          {panel === "subs" &&
-            captions.map((c) => (
-              <Row key={c.value} selected={c.selected} onClick={() => c.select()}>
-                {c.label}
-              </Row>
-            ))}
+          {panel === "subs" && (
+            <>
+              {captions.map((c) => (
+                <Row key={c.value} selected={c.selected} onClick={() => (c.select(), p.onSubPick?.(c.value === "off" ? null : c.label))}>
+                  {c.label}
+                </Row>
+              ))}
+              {subsOn && p.onSubShift && (
+                <div className="mt-3 border-t border-white/10 px-3 pt-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-bone-mute">Sync</div>
+                  <div className="flex items-center gap-2">
+                    <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => p.onSubShift!(Math.round(((p.subShift ?? 0) - 0.5) * 10) / 10)}>
+                      −0.5s
+                    </button>
+                    <span className="min-w-[4.5rem] text-center text-sm tabular-nums text-bone">
+                      {(p.subShift ?? 0) > 0 ? "+" : ""}
+                      {(p.subShift ?? 0).toFixed(1)}s
+                    </span>
+                    <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => p.onSubShift!(Math.round(((p.subShift ?? 0) + 0.5) * 10) / 10)}>
+                      +0.5s
+                    </button>
+                  </div>
+                  <p className="mt-2 text-[11px] leading-snug text-bone-mute">Subtitles too early? Press +. Too late? Press −. Or try another English track above.</p>
+                  {(p.subShift ?? 0) !== 0 && (
+                    <button className="mt-1 text-xs text-bone-dim underline underline-offset-4" onClick={() => p.onSubShift!(0)}>
+                      Reset
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
           {panel === "info" && <div className="space-y-3 px-3 text-xs leading-relaxed text-bone-dim">{p.info}</div>}
           {panel === "speed" &&
             SPEEDS.map((s) => (

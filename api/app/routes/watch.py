@@ -256,22 +256,23 @@ async def streams(
 
 
 @router.get("/subtitles/{media_type}/{tmdb_id}")
-async def subs(media_type: MediaType, tmdb_id: int, season: int | None = None, episode: int | None = None, link: LinkInfo = Depends(require_link)):
+async def subs(media_type: MediaType, tmdb_id: int, season: int | None = None, episode: int | None = None, file: str = "", link: LinkInfo = Depends(require_link)):
     m = await tmdb.meta(media_type, tmdb_id)
     if not m.get("imdb_id"):
         return []
-    key = f"subs:{m['imdb_id']}:{season}:{episode}"
+    file = file[-200:]
+    key = f"subs2:{m['imdb_id']}:{season}:{episode}:{hash_token(file)[:16]}"
     cached = await redis.get(key)
     if cached:
         return json.loads(cached)
-    out = await subtitles.list_for(m["imdb_id"], media_type, season, episode)
+    out = await subtitles.list_for(m["imdb_id"], media_type, season, episode, file)
     await redis.setex(key, 6 * 3600 if out else 300, json.dumps(out))
     return out
 
 
 @router.get("/subs/vtt")
-async def vtt(u: str, link: LinkInfo = Depends(require_link)):
-    text = await subtitles.fetch_vtt(u)
+async def vtt(u: str, shift: float = 0, link: LinkInfo = Depends(require_link)):
+    text = subtitles.shift_vtt(await subtitles.fetch_vtt(u), max(-120.0, min(120.0, shift)))
     return Response(text, media_type="text/vtt; charset=utf-8", headers={"Cache-Control": "private, max-age=86400"})
 
 
