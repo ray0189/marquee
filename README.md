@@ -4,14 +4,7 @@ A private, invite-only streaming site for your [TorBox](https://torbox.app) acco
 instead of an account. They browse a Netflix-style catalogue (from TMDB), press play, and Marquee finds a cached
 release, plays it in the browser and remembers where they got to. Your TorBox key stays on your server.
 
-![Home](docs/screenshots/home.jpg)
-
-<table>
-  <tr>
-    <td width="66%"><img src="docs/screenshots/title.jpg" alt="Title page with ranked sources"></td>
-    <td><img src="docs/screenshots/mobile.jpg" alt="Phone"></td>
-  </tr>
-</table>
+<p align="center"><img src="docs/screenshots/hero.webp" alt="Marquee on desktop and phone" width="100%"></p>
 
 **New here?** Follow the step-by-step guide: **[docs/SETUP.md](docs/SETUP.md)**. It covers installing, the admin
 panel, inviting friends and putting it online with a Cloudflare Tunnel.
@@ -21,11 +14,31 @@ panel, inviting friends and putting it online with a Cloudflare Tunnel.
 - **Plays almost anything in the browser.** It uses direct play where it can, otherwise it converts the file in the
   browser (MKV, AC-3/E-AC-3 audio, any audio language) and falls back to TorBox's transcoder for the rest. Works on
   iPhone, Android, desktop and TV browsers.
-- **Player.** Audio and subtitle switching, speed, double-tap to skip, Chromecast and AirPlay.
+- **Player.** Audio and subtitle switching, subtitles matched to the file with a sync control, speed, volume boost
+  up to 200%, double-tap to skip, Chromecast and AirPlay.
+- **Sensible defaults.** Optional English-only sources and audio, adult releases blocked everywhere, recent
+  searches, and the right film picked even from big collection packs.
 - **Sources.** Searches Torrentio, TorrentsDB, Comet and StremThru Torz in parallel, keeps what TorBox already has
   cached and ranks it for the viewer's device. You can add any Stremio-style addon.
 - **Continue watching** and **up next** for series, per link.
 - **Runs anywhere Docker runs.** A NAS, a mini PC or a VPS. Includes nightly backups and an optional Cloudflare Tunnel.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/title.webp" alt="Title page with ranked sources"><br><sub><b>Title page</b>: sources ranked for the viewer's device, cached ones only</sub></td>
+    <td width="50%"><img src="docs/screenshots/player.webp" alt="Player"><br><sub><b>Player</b>: audio, subtitles with sync, speed, volume boost, cast</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/browse.webp" alt="Browse films"><br><sub><b>Browse</b>: popular, trending, top rated, by genre and service</sub></td>
+    <td><img src="docs/screenshots/search.webp" alt="Search"><br><sub><b>Search</b>: typo-tolerant, with recent searches</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/phones.webp" alt="On a phone"><br><sub><b>Phones and tablets</b>: bottom tabs, built for touch</sub></td>
+    <td><img src="docs/screenshots/admin.webp" alt="Admin panel"><br><sub><b>Admin</b> (your network only): invite links, devices, sources, quality</sub></td>
+  </tr>
+</table>
 
 ## What you need
 
