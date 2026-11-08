@@ -185,7 +185,7 @@ export function Player(p: Props) {
           const direct = await playReq("direct");
           directRes.current = direct;
           if (cancelled) return;
-          setStatus(`Checking what your ${dev.kind === "desktop" ? "browser" : dev.kind} can play…`);
+          setStatus("Opening the film…");
           const plan = await planFile(direct, resumeAt.current, prefLang());
           if (cancelled) {
             plan.session?.destroy();
