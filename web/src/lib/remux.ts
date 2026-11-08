@@ -366,8 +366,9 @@ export class RemuxSession {
           : {
               codec: audio!.out!,
               ...(audio!.out === "flac" ? { sampleFormat: "s16" as const } : {}),
-              // Browser AAC encoders take at most 5.1; 7.1 tracks are mixed down to stereo, which every device plays.
-              ...(audio!.channels > 6 ? { numberOfChannels: 2 } : {}),
+              // Converted sound is always mixed down to stereo: Safari's encoder put 5.1 out of one speaker, and
+              // browser AAC encoders take at most 5.1 anyway. Stereo plays correctly everywhere.
+              numberOfChannels: 2,
             }
         : { discard: true };
     const conversion = await mb.Conversion.init({
