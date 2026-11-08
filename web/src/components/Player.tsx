@@ -80,6 +80,13 @@ export function Player(p: Props) {
   const t0 = useRef(Date.now());
   const [startMs, setStartMs] = useState<number | null>(null);
   const resumeAt = useRef(p.resume);
+  // Last position actually reached while playing. On a switch (direct -> remux -> TorBox transcode) the failing
+  // element's currentTime can read ~0 (a session that had only just started, or one that reset itself), which
+  // made the transcode start from the beginning; this one only moves on real progress.
+  const lastPos = useRef(0);
+  const jumpRetried = useRef(false);
+  const progressed = useRef(false); // this element has really played (not just loaded)
+  const placeNow = () => (lastPos.current > 1 ? lastPos.current : 0) || player.current?.currentTime || resumeAt.current;
   const resumed = useRef(false);
   const playing = useRef(false); // has this source produced a frame yet?
   const tried = useRef<Set<Stage>>(new Set());
@@ -136,7 +143,7 @@ export function Player(p: Props) {
     if (p.waitForRelease) return;
     const key = `${p.type}:${p.id}:${p.season}:${p.episode}:${p.hash}`;
     if (startedFor.current === key) return;
-    if (startedFor.current !== null) resumeAt.current = player.current?.currentTime || resumeAt.current; // switching source mid-film
+    if (startedFor.current !== null) resumeAt.current = placeNow(); // switching source mid-film
     startedFor.current = key;
     t0.current = Date.now();
     setStartMs(null);
@@ -148,6 +155,9 @@ export function Player(p: Props) {
     setMismatch(null);
     resumed.current = false;
     playing.current = false;
+    lastPos.current = 0;
+    jumpRetried.current = false;
+    progressed.current = false;
     tried.current = new Set();
     directRes.current = null;
     autoLang.current = false;
@@ -200,8 +210,11 @@ export function Player(p: Props) {
     async (from: Stage, reason = "") => {
       console.warn("[marquee] falling back from", from, reason);
       tried.current.add(from);
-      resumeAt.current = player.current?.currentTime || resumeAt.current;
+      resumeAt.current = Math.max(placeNow(), resumeAt.current > 5 && lastPos.current < 1 ? resumeAt.current : 0);
       resumed.current = false;
+      lastPos.current = 0;
+      jumpRetried.current = false;
+      progressed.current = false;
       dropRemux();
       setReady(null);
       try {
@@ -423,7 +436,22 @@ export function Player(p: Props) {
               if (pl && !resumed.current && resumeAt.current > 5) pl.currentTime = resumeAt.current;
               resumed.current = true;
             }}
+            onSeeking={(t) => {
+              if (t > 1) lastPos.current = t; // a deliberate jump is where the viewer is, even before data arrives
+            }}
             onTimeUpdate={({ currentTime }) => {
+              const pl = player.current;
+              if (pl && !pl.state.seeking && !pl.state.waiting && currentTime > 0.5) {
+                // A player that ignored the resume jump (Safari's own HLS can, when it comes too early) and started
+                // near 0: jump again, once.
+                if (resumeAt.current > 15 && !jumpRetried.current && !progressed.current && currentTime < resumeAt.current - 10) {
+                  jumpRetried.current = true;
+                  pl.currentTime = resumeAt.current;
+                  return;
+                }
+                progressed.current = true;
+                lastPos.current = currentTime;
+              }
               const d = player.current?.duration ?? 0;
               if (p.next && d > 300) setShowNext(d - currentTime < 40);
             }}
