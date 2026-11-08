@@ -1,16 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="mq-g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#b9adff"/>
-      <stop offset="1" stop-color="#6551ee"/>
-    </linearGradient>
-    <radialGradient id="mq-h" cx="0.25" cy="0.12" r="0.85">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.38"/>
-      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="64" height="64" rx="16" fill="url(#mq-g)"/>
-  <rect width="64" height="64" rx="16" fill="url(#mq-h)"/>
-  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="15.25" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.5"/>
-  <path d="M26.5 21.5 L44 32 L26.5 42.5 Z" fill="#ffffff" stroke="#ffffff" stroke-width="6" stroke-linejoin="round"/>
+  <defs><radialGradient id="glow" cx="0.5" cy="1.05" r="0.75"><stop offset="0" stop-color="#9b8cff" stop-opacity="0.55"/><stop offset="1" stop-color="#9b8cff" stop-opacity="0"/></radialGradient>
+  <linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26262d"/><stop offset="1" stop-color="#121216"/></linearGradient></defs>
+  <rect width="64" height="64" rx="16" fill="url(#t)"/>
+  <rect width="64" height="64" rx="16" fill="url(#glow)"/>
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="15.25" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.5"/>
+  <path d="M26.5 21.5 L44 32 L26.5 42.5 Z" fill="#f4f4f6" stroke="#f4f4f6" stroke-width="6" stroke-linejoin="round"/>
 </svg>
