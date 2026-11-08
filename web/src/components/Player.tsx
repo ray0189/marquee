@@ -1,6 +1,6 @@
 import { isHLSProvider, isVideoProvider, MediaPlayer, MediaProvider, Track, type MediaPlayerInstance, type PlayerSrc } from "@vidstack/react";
 import "@vidstack/react/player/styles/default/theme.css";
-import { AlertTriangle, ArrowLeft, Loader2, SkipForward, X, Zap } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, SkipForward, VolumeX, X, Zap } from "lucide-react";
 import type { AudioTrack as VAudioTrack } from "@vidstack/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, img, post, sessionHeaders, withSession } from "../api";
@@ -54,6 +54,9 @@ export function Player(p: Props) {
   const [error, setError] = useState<string | null>(null);
   const [subs, setSubs] = useState<SubtitleTrack[]>([]);
   const warmer = useRef<HlsWarmer | null>(null);
+  // The browser refused to start with sound (the tap on Play was too long ago by the time the video was ready):
+  // play muted instead of sitting paused, and offer one tap for sound.
+  const [soundBlocked, setSoundBlocked] = useState(false);
   const [subShift, setSubShift] = useState(0); // seconds; positive shows subtitles later
   const [subPick, setSubPick] = useState<string | null>(null); // label of the chosen track, kept across shifts
   const [audio, setAudio] = useState<number | null>(null);
@@ -386,6 +389,15 @@ export function Player(p: Props) {
             crossOrigin={ready.mode === "hls" && !isSafari ? "anonymous" : undefined}
             playsInline
             autoPlay
+            onAutoPlayFail={(detail) => {
+              const pl = player.current;
+              if (!pl || detail.muted) return;
+              pl.muted = true;
+              void pl.play().then(() => setSoundBlocked(true)).catch(() => undefined);
+            }}
+            onVolumeChange={(detail) => {
+              if (!detail.muted) setSoundBlocked(false);
+            }}
             onProviderSetup={(provider) => {
               if (remux.current && isVideoProvider(provider)) remux.current.bind(provider.video);
             }}
@@ -518,6 +530,17 @@ export function Player(p: Props) {
           <div className="pointer-events-none absolute inset-x-0 top-4 z-30 mx-auto flex w-fit max-w-[92%] items-center gap-2.5 rounded-full border border-white/10 bg-black/70 px-4 py-2 text-xs text-bone backdrop-blur-md animate-rise">
             <Loader2 className="animate-spin" size={14} /> {switching}
           </div>
+        )}
+        {soundBlocked && (
+          <button
+            onClick={() => {
+              if (player.current) player.current.muted = false;
+              setSoundBlocked(false);
+            }}
+            className="absolute inset-x-0 top-20 z-40 mx-auto flex w-fit items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black shadow-lift animate-pop active:scale-95"
+          >
+            <VolumeX size={17} /> Tap for sound
+          </button>
         )}
         {toast && <div className="absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-ember/40 bg-black/80 px-4 py-2 text-xs text-ember backdrop-blur-md">{toast}</div>}
 

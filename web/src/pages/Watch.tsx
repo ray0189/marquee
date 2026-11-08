@@ -8,6 +8,7 @@ import { epLabel } from "../lib/format";
 import { useStreams } from "../lib/useStreams";
 import type { HistoryItem, MediaType, Meta, StreamItem } from "../types";
 import { useBack } from "../lib/back";
+import { playPath } from "../lib/compat";
 
 export default function Watch() {
   const { type, id } = useParams();
@@ -37,11 +38,15 @@ export default function Watch() {
       .catch(() => setResume(0));
   }, [mt, tid, season, episode]);
 
-  // No source chosen yet: take the best one once every indexer has answered. If one is slow, go with what's
-  // in after 4 s rather than keep the viewer waiting; early results are often not the best ones.
+  // No source chosen yet: take the best one once every indexer has answered. If the best so far is cached and
+  // plays here without TorBox's transcode, start almost at once; otherwise give slower indexers up to 4 s, since
+  // early results are often not the best ones.
   useEffect(() => {
     if (hash || !streams.items.length) return;
-    const t = setTimeout(() => setSp((q) => (q.get("h") ? q : new URLSearchParams({ ...Object.fromEntries(q), h: streams.items[0].hash })), { replace: true }), streams.final ? 0 : 4000);
+    const top = streams.items[0];
+    const sure = top.cached && playPath(top.release) !== "hls";
+    const wait = streams.final ? 0 : sure ? 1200 : 4000;
+    const t = setTimeout(() => setSp((q) => (q.get("h") ? q : new URLSearchParams({ ...Object.fromEntries(q), h: streams.items[0].hash })), { replace: true }), wait);
     return () => clearTimeout(t);
   }, [hash, streams.items, streams.final, setSp]);
 
