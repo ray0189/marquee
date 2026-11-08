@@ -30,6 +30,7 @@ interface Props {
   subShift?: number; // subtitle timing offset in seconds
   onSubShift?: (s: number) => void;
   onSubPick?: (label: string | null) => void;
+  onScrubAt?: (seconds: number) => void; // while dragging, before the seek happens (transcode warm-up)
   cast?: Omit<CastMedia, "time"> | null; // what a TV can fetch itself (never the in-browser remux)
   onBack: () => void;
 }
@@ -181,8 +182,20 @@ export function PlayerControls(p: Props) {
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setScrub(posFrom(e.clientX));
+    warmAt(posFrom(e.clientX));
   };
-  const onBarMove = (e: React.PointerEvent) => scrub !== null && setScrub(posFrom(e.clientX));
+  const scrubWarm = useRef<number>();
+  const warmAt = (t: number) => {
+    if (!p.onScrubAt) return;
+    window.clearTimeout(scrubWarm.current);
+    scrubWarm.current = window.setTimeout(() => p.onScrubAt!(t), 180); // once the finger pauses on a spot
+  };
+  const onBarMove = (e: React.PointerEvent) => {
+    if (scrub === null) return;
+    const t = posFrom(e.clientX);
+    setScrub(t);
+    warmAt(t);
+  };
   const onBarUp = (e: React.PointerEvent) => {
     e.stopPropagation();
     if (scrub !== null) remote.seek(scrub);

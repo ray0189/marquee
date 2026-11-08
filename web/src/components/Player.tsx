@@ -7,6 +7,7 @@ import { api, ApiError, img, post, sessionHeaders, withSession } from "../api";
 import { isSafari, playPath } from "../lib/compat";
 import { device } from "../lib/device";
 import { epLabel, fmtSize } from "../lib/format";
+import { HlsWarmer } from "../lib/hlsWarm";
 import { planFile, type Plan, type Stage } from "../lib/plan";
 import { audioScore, RemuxSession, remuxSupported, warmRemux } from "../lib/remux";
 import { PlayerControls, type AudioOption } from "./PlayerControls";
@@ -52,6 +53,7 @@ export function Player(p: Props) {
   const [status, setStatus] = useState("Finding the fastest route…");
   const [error, setError] = useState<string | null>(null);
   const [subs, setSubs] = useState<SubtitleTrack[]>([]);
+  const warmer = useRef<HlsWarmer | null>(null);
   const [subShift, setSubShift] = useState(0); // seconds; positive shows subtitles later
   const [subPick, setSubPick] = useState<string | null>(null); // label of the chosen track, kept across shifts
   const [audio, setAudio] = useState<number | null>(null);
@@ -306,6 +308,13 @@ export function Player(p: Props) {
     if (i >= 0 && i !== cur && player.current?.audioTracks[i]) player.current.audioTracks[i].selected = true;
   };
 
+  // Transcoded streams: warm TorBox up at the scrub position before the seek happens (see hlsWarm.ts)
+  const hlsUrl = ready?.mode === "hls" ? ready.url : null;
+  useEffect(() => {
+    warmer.current = hlsUrl ? new HlsWarmer(hlsUrl) : null;
+    return () => warmer.current?.dispose();
+  }, [hlsUrl]);
+
   // External subtitles, ranked for the file actually playing (same release group/source/cut stay in sync)
   const fileName = ready?.file?.name ?? "";
   useEffect(() => {
@@ -440,6 +449,7 @@ export function Player(p: Props) {
             <PlayerControls
               subShift={subShift}
               onSubShift={setSubShift}
+              onScrubAt={hlsUrl ? (t) => void warmer.current?.warm(t) : undefined}
               onSubPick={setSubPick}
               player={player}
               title={p.title}
