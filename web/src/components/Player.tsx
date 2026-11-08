@@ -7,6 +7,7 @@ import { api, ApiError, img, post, sessionHeaders, withSession } from "../api";
 import { isSafari, playPath } from "../lib/compat";
 import { device } from "../lib/device";
 import { epLabel, fmtSize } from "../lib/format";
+import { wakeBoost } from "../lib/boost";
 import { HlsWarmer } from "../lib/hlsWarm";
 import { planFile, type Plan, type Stage } from "../lib/plan";
 import { audioScore, RemuxSession, remuxSupported, warmRemux } from "../lib/remux";
@@ -86,6 +87,9 @@ export function Player(p: Props) {
   const lastPos = useRef(0);
   const jumpRetried = useRef(false);
   const progressed = useRef(false); // this element has really played (not just loaded)
+  const audioChecked = useRef(false);
+  const stallTimer = useRef<number>();
+  const startedAtPos = useRef(0);
   const placeNow = () => (lastPos.current > 1 ? lastPos.current : 0) || player.current?.currentTime || resumeAt.current;
   const resumed = useRef(false);
   const playing = useRef(false); // has this source produced a frame yet?
@@ -158,6 +162,7 @@ export function Player(p: Props) {
     lastPos.current = 0;
     jumpRetried.current = false;
     progressed.current = false;
+    audioChecked.current = false;
     tried.current = new Set();
     directRes.current = null;
     autoLang.current = false;
@@ -215,6 +220,7 @@ export function Player(p: Props) {
       lastPos.current = 0;
       jumpRetried.current = false;
       progressed.current = false;
+      audioChecked.current = false;
       dropRemux();
       setReady(null);
       try {
@@ -409,6 +415,23 @@ export function Player(p: Props) {
               pl.muted = true;
               void pl.play().then(() => setSoundBlocked(true)).catch(() => undefined);
             }}
+            onWaiting={() => {
+              // Stuck "loading" with video already buffered right ahead: wake a suspended audio engine (volume
+              // boost) and nudge the playhead past whatever boundary the decoder is stuck on.
+              window.clearTimeout(stallTimer.current);
+              stallTimer.current = window.setTimeout(() => {
+                const v = document.querySelector("video");
+                if (!v || v.paused || v.seeking) return;
+                let ahead = 0;
+                for (let i = 0; i < v.buffered.length; i++) if (v.currentTime >= v.buffered.start(i) - 0.1 && v.currentTime <= v.buffered.end(i)) ahead = v.buffered.end(i) - v.currentTime;
+                if (ahead > 3 && v.readyState < 3) {
+                  console.warn("[marquee] stalled with", ahead.toFixed(0), "s buffered: nudging");
+                  wakeBoost(v);
+                  v.currentTime = v.currentTime + 0.05;
+                }
+              }, 3000);
+            }}
+            onPlaying={() => window.clearTimeout(stallTimer.current)}
             onVolumeChange={(detail) => {
               if (!detail.muted) setSoundBlocked(false);
             }}
@@ -444,6 +467,17 @@ export function Player(p: Props) {
             }}
             onTimeUpdate={({ currentTime }) => {
               const pl = player.current;
+              // Direct play of a file whose audio this browser can't decode plays silently with no error.
+              // Chromium counts decoded audio bytes: none after a few seconds means switch to the remux, which
+              // converts the audio, at the same second.
+              if (ready.mode === "direct" && !audioChecked.current && progressed.current && currentTime - startedAtPos.current > 4) {
+                audioChecked.current = true;
+                const v = document.querySelector("video") as (HTMLVideoElement & { webkitAudioDecodedByteCount?: number }) | null;
+                if (v && typeof v.webkitAudioDecodedByteCount === "number" && v.webkitAudioDecodedByteCount === 0 && !v.muted && remuxSupported() && !tried.current.has("remux")) {
+                  void fallbackRef.current("direct", "no sound from this file's audio here");
+                  return;
+                }
+              }
               if (pl && !pl.state.seeking && !pl.state.waiting && currentTime > 0.5) {
                 // A player that ignored the resume jump (Safari's own HLS can, when it comes too early) and started
                 // near 0: jump again, once.
@@ -452,6 +486,7 @@ export function Player(p: Props) {
                   pl.currentTime = resumeAt.current;
                   return;
                 }
+                if (!progressed.current) startedAtPos.current = currentTime;
                 progressed.current = true;
                 lastPos.current = currentTime;
               }

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import logging
 import time
 from typing import Literal
@@ -148,7 +149,7 @@ async def home(link: LinkInfo = Depends(require_link)):
 
 @router.get("/search")
 async def do_search(q: str = "", type: MediaType | None = None, link: LinkInfo = Depends(require_link)):
-    q = q.strip()
+    q = q.strip()[:200]  # longer than any real title; very long input was passed straight on to TMDB
     if not q:
         return {"items": []}
     items = await search.query(q, 24, type)
@@ -392,10 +393,17 @@ async def title_history(media_type: MediaType, tmdb_id: int, link: LinkInfo = De
 # --- media proxy ---------------------------------------------------------------------------
 
 
+_SAFE_HLS_PATH = re.compile(r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*")
+
+
 @router.get("/hls/{pid}/{path:path}")
 async def hls_proxy(pid: str, path: str, request: Request):
     """Transcoded (HLS) stream whose TorBox URL embeds the account key: relay the playlist and segments.
     Relative entries resolve against this route by themselves; absolute ones on the same host are rewritten."""
+    # Only plain file names under the stream's own folder: no "..", leading slash, backslash or full URL, which
+    # could otherwise reach other paths on TorBox's servers with this stream's token.
+    if not _SAFE_HLS_PATH.fullmatch(path) or ".." in path or path.startswith("/"):
+        raise HTTPException(404, {"code": "BAD_MEDIA", "message": "Not found"})
     raw = await redis.get(f"hlsproxy:{pid}")
     if not raw:
         raise HTTPException(404, {"code": "BAD_MEDIA", "message": "That stream link has expired. Press play again."})

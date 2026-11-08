@@ -13,10 +13,10 @@ from .language import is_english
 from . import indexers as ix_mod, library, settings_store as store, torbox
 from .indexers import Candidate
 from .rds import redis
-from .release import is_blocked, parse, passes, pick_file, score
+from .release import browser_friendly, is_blocked, parse, passes, pick_file, score
 
 log = logging.getLogger("marquee.resolver")
-CACHE_VERSION = "v7"  # v7: English-only option; v6: adult releases filtered (v3: releases that say they are a different film)
+CACHE_VERSION = "v8"  # v7: English-only option; v6: adult releases filtered (v3: releases that say they are a different film)
 
 # Same-name releases that announce they aren't the film the IMDb id points at, e.g. "(NOT The Chris Nolan FILM)".
 _NOT_THIS = re.compile(r"\bnot[\s._-]+the[\s._-]+[\w'.-]+(?:[\s._-]+[\w'.-]+){0,3}?[\s._-]+(?:film|movie)\b", re.I)
@@ -69,7 +69,14 @@ def rank(pool: dict[str, Candidate], q: dict, media_type: str = "tv", imdb_answe
     if not items:  # nothing at the requested quality: show the best of what exists
         relaxed.sort(key=lambda i: i["score"], reverse=True)
         items = relaxed[:20]
-    return items[: q["max_results"]], hidden
+    # The list is capped, and for big films the top by quality is all 50-65 GB 4K remuxes (TrueHD, Dolby Vision)
+    # that most devices must transcode. Keep room for the best light releases that play without TorBox.
+    cap = q["max_results"]
+    friendly = [i for i in items if i["cached"] and browser_friendly(parse(i["title"], ""))][:20]
+    keep = items[: cap - len([f for f in friendly if f not in items[: cap - 20]])] if len(items) > cap else items
+    out = keep + [f for f in friendly if f not in keep]
+    out.sort(key=lambda i: i["score"], reverse=True)
+    return out[:cap], hidden
 
 
 async def _mark_cached(pool: dict[str, Candidate]) -> None:

@@ -159,6 +159,17 @@ def score(rel: Release, *, seeders: int, cached: bool, owned: bool, q: dict) -> 
     return pts
 
 
+def browser_friendly(rel: Release) -> bool:
+    """Likely to play in a browser without TorBox's transcode: a light, common encode (<=1080p H.264/HEVC,
+    normal audio, no Dolby Vision)."""
+    if rel.container in ("avi", "wmv", "ts", "m2ts", "mpg", "mpeg") or rel.codec in ("mpeg4", "vc1"):
+        return False
+    if rel.resolution > 1080 or "DV" in rel.hdr:
+        return False
+    audio = {a for a in rel.audio if a != "atmos"}
+    return not audio or bool(audio & {"aac", "ac3", "eac3", "opus", "flac", "mp3"})
+
+
 def is_video(f: dict) -> bool:
     name = (f.get("name") or f.get("short_name") or "").lower()
     ext = "." + name.rsplit(".", 1)[-1] if "." in name else ""

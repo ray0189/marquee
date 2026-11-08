@@ -16,6 +16,12 @@
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
+		# Always HTTPS once seen over HTTPS (ignored on plain-HTTP LAN addresses), and never inside another
+		# site's frame (clickjacking). Camera, mic, location and payments are never used.
+		Strict-Transport-Security "max-age=31536000"
+		X-Frame-Options DENY
+		Content-Security-Policy "frame-ancestors 'none'"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 		X-Robots-Tag "noindex, nofollow"
 		-Server
 	}

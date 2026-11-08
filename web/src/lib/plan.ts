@@ -46,11 +46,25 @@ export interface PlanOpts {
   forceRemux?: boolean;
 }
 
+function obviouslyDirect(h: PlayResult["hints"], dv: ReturnType<typeof device>): boolean {
+  if (!["mp4", "m4v", "mov"].includes(h.container)) return false;
+  if (!(h.codec === "avc" || (h.codec === "hevc" && dv.hevc))) return false;
+  if (h.hdr.length) return false;
+  const audio = h.audio.filter((a) => a !== "atmos");
+  return audio.length === 0 || (audio.length === 1 && audio[0] === "aac");
+}
+
 export async function planFile(res: PlayResult, startAt: number, lang: string, opts: PlanOpts = {}): Promise<Plan> {
   const { preferProxy = false, forceRemux = false } = opts;
   const dv = device();
   const hints = res.hints;
   if (hints.hdr.includes("DV") && dv.browser !== "safari") return { stage: "hls", note: "Dolby Vision isn't supported on this device, so TorBox converts it" };
+
+  // Fast path: a file whose name says it plays natively here (MP4 + H.264/HEVC-with-decoder, AAC or unnamed
+  // audio, one track) starts at once. Reading the file first cost seconds (a 7.7 MB index through the tunnel)
+  // only to conclude "direct". If the guess is wrong (silent audio, or an error) the player falls back to the
+  // remux at the same second.
+  if (!forceRemux && !preferProxy && obviouslyDirect(hints, dv)) return { stage: "direct", src: res.url, note: "" };
 
   const urls = [res.url, res.proxy].filter((u, i, a): u is string => !!u && a.indexOf(u) === i);
   const sources = preferProxy ? [...urls].reverse() : urls;

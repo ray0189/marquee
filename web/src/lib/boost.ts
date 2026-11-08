@@ -42,8 +42,21 @@ export function setBoost(video: HTMLMediaElement, factor: number): boolean {
     source.connect(gain).connect(limiter).connect(ctx.destination);
     g = { ctx, gain };
     graphs.set(video, g);
+    // Once the video's sound runs through Web Audio, Chromium paces the video by it: a suspended context (after a
+    // seek, a tab switch, a device change) leaves the picture frozen with plenty buffered. Keep it running.
+    const wake = () => {
+      if (ctx.state === "suspended" && !video.paused) void ctx.resume();
+    };
+    ctx.addEventListener("statechange", wake);
+    for (const ev of ["play", "playing", "seeked", "waiting"]) video.addEventListener(ev, wake);
   }
   if (g.ctx.state === "suspended") void g.ctx.resume();
   g.gain.gain.setTargetAtTime(Math.max(1, Math.min(2, factor)), g.ctx.currentTime, 0.02);
   return true;
+}
+
+/** Resume a boosted video's audio engine if it was suspended (a frozen picture with data buffered). */
+export function wakeBoost(video: HTMLMediaElement): void {
+  const g = graphs.get(video);
+  if (g && g.ctx.state === "suspended") void g.ctx.resume();
 }
