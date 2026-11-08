@@ -22,8 +22,14 @@ export interface RemuxAudio {
 }
 
 const COPY_OK = new Set(["aac", "mp3", "opus", "flac"]);
-const BUFFER_AHEAD = 80; // seconds to keep converted ahead of the playhead
-const BUFFER_BEHIND = 40;
+// How far ahead to keep converted: as much as fits in a memory budget at this file's real bitrate, between
+// 1 and 10 minutes (about 5 minutes of a typical 1080p WEB file, about 1 minute of a 4K remux). Browsers cap
+// what a page may hold for MSE playback (~150 MB of video in Chrome), and phones less, so it's bytes that
+// matter, not seconds.
+const BUFFER_MIN = 60;
+const BUFFER_MAX = 600;
+const MEM_BUDGET = (/iPhone|iPad|Android/i.test(navigator.userAgent) ? 80 : 140) * 1024 * 1024;
+const BUFFER_BEHIND = 30;
 
 /** Desktop and Android: MediaSource. iPhone (iOS 17.1+): ManagedMediaSource, same idea with the OS in charge of buffering. */
 export const remuxSupported = () => {
@@ -94,6 +100,13 @@ export class RemuxSession {
   private pendingSeek: number | null = null;
   /** Bytes pushed into the player so far: lets the watchdog tell "slow" from "stuck". */
   appended = 0;
+  private rate = 0; // bytes per second of film, measured as it converts
+  private squeeze = 1; // shrinks when the browser refuses more data (its memory cap), recovers slowly
+
+  private aheadTarget(): number {
+    if (!this.rate) return BUFFER_MIN;
+    return Math.max(20, Math.min(BUFFER_MAX, Math.max(BUFFER_MIN, MEM_BUDGET / this.rate)) * this.squeeze);
+  }
 
   private constructor(readonly src: string, private startAt: number) {
     this.url = URL.createObjectURL(this.mse);
@@ -320,13 +333,17 @@ export class RemuxSession {
       let step = 2;
       for (;;) {
         if (this.dead || gen !== this.gen) return;
-        if (this.bufferedAhead() > BUFFER_AHEAD) {
+        if (this.bufferedAhead() > this.aheadTarget()) {
           await sleep(400);
           continue;
         }
         until += step;
-        step = Math.min(20, Math.ceil(step * 2));
+        const before = this.appended;
         await c.execute({ until });
+        const r = (this.appended - before) / step; // this step's bytes per second of film
+        if (r > 0) this.rate = this.rate ? this.rate * 0.7 + r * 0.3 : r;
+        this.squeeze = Math.min(1, this.squeeze + 0.02);
+        step = Math.min(20, Math.ceil(step * 2));
         if (c.state === "done" || until > this.duration - start + 30) break;
       }
       await this.chain;
@@ -363,9 +380,21 @@ export class RemuxSession {
       });
     } catch (e) {
       if (retry && (e as DOMException)?.name === "QuotaExceededError") {
-        const t = this.video?.currentTime ?? 0;
-        await this.removeRange(0, Math.max(0, t - 10));
-        return this.append(data, false);
+        // The browser's memory cap: aim lower from now on, free what's behind, and wait for playback to make
+        // room, rather than giving up (which would drop to TorBox's slower transcode).
+        this.appended -= data.byteLength;
+        this.squeeze = Math.max(0.25, this.squeeze * 0.7);
+        for (let i = 0; i < 60 && !this.dead; i++) {
+          const t = this.video?.currentTime ?? 0;
+          await this.removeRange(0, Math.max(0, t - 5));
+          try {
+            return await this.append(data, false);
+          } catch (e2) {
+            if ((e2 as DOMException)?.name !== "QuotaExceededError") throw e2;
+            this.appended -= data.byteLength;
+            await sleep(1000);
+          }
+        }
       }
       throw e;
     }

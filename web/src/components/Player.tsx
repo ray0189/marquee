@@ -401,6 +401,7 @@ export function Player(p: Props) {
             src={{ src: ready.url, type: ready.mime } as PlayerSrc}
             crossOrigin={ready.mode === "hls" && !isSafari ? "anonymous" : undefined}
             playsInline
+            preload="auto" // let the browser buffer as far ahead as it allows (it held only ~10-25 s on "metadata")
             autoPlay
             onAutoPlayFail={(detail) => {
               const pl = player.current;
@@ -417,7 +418,9 @@ export function Player(p: Props) {
             onProviderChange={(provider) => {
               if (isHLSProvider(provider)) {
                 provider.library = () => import("hls.js");
-                provider.config = { maxBufferLength: 40, maxMaxBufferLength: 90, backBufferLength: 30, enableWorker: true, capLevelToPlayerSize: true, startFragPrefetch: true, manifestLoadingMaxRetry: 4, levelLoadingMaxRetry: 4, fragLoadingMaxRetry: 6, nudgeMaxRetry: 8 };
+                // Buffer two minutes ahead (up to ten when the stream is light), capped in bytes so phones stay within
+                // their memory; hls.js trims to fit by itself. Safari plays HLS natively and buffers on its own.
+                provider.config = { maxBufferLength: 120, maxMaxBufferLength: 600, maxBufferSize: (/iPhone|iPad|Android/i.test(navigator.userAgent) ? 90 : 200) * 1000 * 1000, backBufferLength: 30, enableWorker: true, capLevelToPlayerSize: true, startFragPrefetch: true, manifestLoadingMaxRetry: 4, levelLoadingMaxRetry: 4, fragLoadingMaxRetry: 6, nudgeMaxRetry: 8 };
               }
             }}
             onCanPlay={() => {
