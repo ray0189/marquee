@@ -58,8 +58,9 @@ export async function planFile(res: PlayResult, startAt: number, lang: string, o
   const { preferProxy = false } = opts;
   // Our engine (the remux) is the main path wherever the browser has MediaSource: measured against direct play
   // it starts sooner (3.2 s vs 4.7 s) and keeps minutes buffered instead of seconds. Direct play is the fallback.
-  const forceRemux = opts.forceRemux || remuxSupported();
   const dv = device();
+  // Not on Safari: it plays MP4/HEVC natively and buffers well, and forcing it through MediaSource broke playback.
+  const forceRemux = opts.forceRemux || (remuxSupported() && dv.browser !== "safari");
   const hints = res.hints;
   if (hints.hdr.includes("DV") && dv.browser !== "safari") return { stage: "hls", note: "Dolby Vision isn't supported on this device, so TorBox converts it" };
 
