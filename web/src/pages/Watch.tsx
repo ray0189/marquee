@@ -7,6 +7,7 @@ import { StreamList } from "../components/StreamList";
 import { epLabel } from "../lib/format";
 import { useStreams } from "../lib/useStreams";
 import type { HistoryItem, MediaType, Meta, StreamItem } from "../types";
+import { useBack } from "../lib/back";
 
 export default function Watch() {
   const { type, id } = useParams();
@@ -78,7 +79,7 @@ export default function Watch() {
   if (mt === "tv" && (season == null || episode == null)) return <Navigate to={`/title/tv/${tid}`} replace />;
 
   const title = meta?.title ?? "";
-  const back = () => (window.history.length > 1 ? nav(-1) : nav(`/title/${mt}/${tid}`));
+  const back = useBack(`/title/${mt}/${tid}`);
   const sourcesBtn = (
     <button onClick={() => setDrawer((d) => !d)} className="flex h-9 items-center gap-1.5 rounded-full bg-white/10 px-3.5 text-sm font-medium text-bone ring-1 ring-white/10 backdrop-blur-md transition hover:bg-white/20">
       <ListVideo size={16} /> Sources

@@ -1,6 +1,7 @@
-import { Film, Home, Search, Tv } from "lucide-react";
+import { ArrowLeft, Film, Home, Search, Tv } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { useBack } from "../lib/back";
 import { SearchOverlay } from "./SearchOverlay";
 import { Wordmark } from "./Logo";
 import { APP_NAME } from "../brand";
@@ -29,6 +30,12 @@ export function Nav({ label }: { label: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Back wherever there's somewhere to go back to: a title page, or a "See all" list (a browse page with
+  // filters). Home and the Films/Series tabs are top-level, so they don't get one.
+  const { pathname, search: query } = useLocation();
+  const showBack = pathname.startsWith("/title/") || (pathname.startsWith("/browse/") && query.length > 1);
+  const back = useBack("/");
+
   const link = ({ isActive }: { isActive: boolean }) => `rounded-full px-4 py-1.5 text-sm font-semibold transition ${isActive ? "bg-white text-black" : "text-bone-dim hover:text-bone"}`;
   const tab = ({ isActive }: { isActive: boolean }) => `flex flex-1 flex-col items-center gap-1 py-2 text-[10.5px] font-semibold transition ${isActive ? "text-bone" : "text-bone-mute"}`;
 
@@ -36,6 +43,15 @@ export function Nav({ label }: { label: string }) {
     <>
       <header className={`safe-t fixed inset-x-0 top-0 z-50 transition duration-300 ${solid ? "sheet bg-ink-950/80 backdrop-blur-xl" : "bg-gradient-to-b from-black/70 to-transparent"}`}>
         <div className="mx-auto flex items-center gap-6 px-5 md:px-10" style={{ height: "var(--nav-h)" }}>
+          {showBack && (
+            <button
+              onClick={back}
+              aria-label="Back"
+              className="-ml-2 -mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-bone transition hover:bg-white/10 active:scale-90 animate-fade"
+            >
+              <ArrowLeft size={22} />
+            </button>
+          )}
           <Link to="/" aria-label={`${APP_NAME} home`}>
             <Wordmark />
           </Link>
