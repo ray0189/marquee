@@ -33,10 +33,10 @@ interface Props {
   actions?: React.ReactNode;
 }
 
-const PREF_KEY = "mq_audio_lang";
+const PREF_KEY = "mq_audio_lang_v2"; // v2: English default; older saved choices came from the device language
 const prefLang = () => {
   try {
-    return localStorage.getItem(PREF_KEY) || (navigator.language || "en").slice(0, 2);
+    return localStorage.getItem(PREF_KEY) || "en"; // English unless the viewer picked another language themselves
   } catch {
     return "en";
   }

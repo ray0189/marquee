@@ -55,6 +55,7 @@ interface Quality {
   browser_bias: number;
   prefer_hdr: boolean;
   max_results: number;
+  english_only: boolean;
 }
 interface Indexer {
   name: string;
@@ -418,7 +419,7 @@ function QualityTab() {
       setMsg((e as Error).message);
     }
   };
-  const Toggle = ({ k, label, hint }: { k: "cached_only" | "allow_uncached_add" | "prefer_hdr"; label: string; hint: string }) => (
+  const Toggle = ({ k, label, hint }: { k: "cached_only" | "allow_uncached_add" | "prefer_hdr" | "english_only"; label: string; hint: string }) => (
     <label className="flex cursor-pointer items-start gap-3">
       <input type="checkbox" className="mt-1 accent-amber" checked={q[k]} onChange={(e) => set({ [k]: e.target.checked })} />
       <span><span className="block text-sm font-medium">{label}</span><span className="text-xs text-bone-mute">{hint}</span></span>
@@ -428,6 +429,7 @@ function QualityTab() {
     <div className="card max-w-2xl space-y-6">
       <Toggle k="cached_only" label="Only show instantly available sources" hint="Hides anything TorBox hasn't already cached." />
       <Toggle k="allow_uncached_add" label="Allow adding uncached torrents" hint="Uses the hourly add budget. Off keeps playback instant and ToS-friendly." />
+      <Toggle k="english_only" label="English only" hint="Hide releases in other languages (dubs, foreign tags, other scripts). A film with no English release at all still shows its original-language ones." />
       <Toggle k="prefer_hdr" label="Prefer HDR / Dolby Vision" hint="Browsers often tone-map these badly; leave off unless your viewers use Safari." />
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

@@ -34,6 +34,7 @@ class Quality(BaseModel):
     browser_bias: int = Field(50, ge=0, le=100)
     prefer_hdr: bool = False
     max_results: int = Field(60, ge=5, le=200)
+    english_only: bool = False  # drop releases in other languages (falls back when a title has no English one)
 
 
 class Indexer(BaseModel):

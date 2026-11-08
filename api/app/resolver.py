@@ -9,13 +9,14 @@ import time
 from collections.abc import AsyncIterator
 
 from .adult import is_adult
+from .language import is_english
 from . import indexers as ix_mod, library, settings_store as store, torbox
 from .indexers import Candidate
 from .rds import redis
 from .release import is_blocked, parse, passes, pick_file, score
 
 log = logging.getLogger("marquee.resolver")
-CACHE_VERSION = "v6"  # v6: adult releases filtered (v3: releases that say they are a different film)
+CACHE_VERSION = "v7"  # v7: English-only option; v6: adult releases filtered (v3: releases that say they are a different film)
 
 # Same-name releases that announce they aren't the film the IMDb id points at, e.g. "(NOT The Chris Nolan FILM)".
 _NOT_THIS = re.compile(r"\bnot[\s._-]+the[\s._-]+[\w'.-]+(?:[\s._-]+[\w'.-]+){0,3}?[\s._-]+(?:film|movie)\b", re.I)
@@ -44,9 +45,15 @@ def _trusted(pool: dict[str, Candidate], media_type: str, imdb_answered: bool) -
     return [c for c in pool.values() if c.indexers - {"library"}]
 
 
-def rank(pool: dict[str, Candidate], q: dict, media_type: str = "tv", imdb_answered: bool = False) -> tuple[list[dict], int]:
+def rank(pool: dict[str, Candidate], q: dict, media_type: str = "tv", imdb_answered: bool = False, title: str = "") -> tuple[list[dict], int]:
     """Rank the whole set first, then filter. Returns (items, hidden_uncached_count)."""
     items, relaxed, hidden = [], [], 0
+    if q.get("english_only"):
+        # English releases only, unless a title has none at all (a film not made in English): then its
+        # original-language releases are better than an empty list.
+        eng = {h for h, c in pool.items() if is_english(c.title, c.filename, title=title)}
+        if any(pool[h].cached for h in eng):
+            pool = {h: c for h, c in pool.items() if h in eng}
     for c in _trusted(pool, media_type, imdb_answered):
         if _NOT_THIS.search(c.title) or _NOT_THIS.search(c.filename):
             continue
@@ -102,7 +109,7 @@ async def resolve(meta: dict, season: int | None, episode: int | None, ip: str) 
         pool[c.hash] = c
     title = meta["title"]
     if pool and mt != "movie":  # a film's name-only library hits wait for an indexer to confirm them
-        items, hidden = rank(pool, q)
+        items, hidden = rank(pool, q, title=title)
         yield {"type": "streams", "final": False, "items": items, "hidden": hidden}
 
     indexers = [i for i in await store.indexers() if i.get("enabled")]
@@ -136,13 +143,13 @@ async def resolve(meta: dict, season: int | None, episode: int | None, ip: str) 
             except torbox.TorBoxError as e:
                 yield {"type": "error", "code": e.code, "message": e.detail or "TorBox is unavailable"}
                 return
-            items, hidden = rank(pool, q, mt, answered)
+            items, hidden = rank(pool, q, mt, answered, title)
             yield {"type": "streams", "final": False, "items": items, "hidden": hidden}
     finally:
         for t in tasks:
             t.cancel()
 
-    items, hidden = rank(pool, q, mt, answered)
+    items, hidden = rank(pool, q, mt, answered, title)
     if indexers and failed_all and not pool:
         yield {"type": "warning", "message": "All indexers failed to respond"}
     else:

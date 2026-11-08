@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 from fastapi import HTTPException
 
 from .adult import is_adult
+from .language import english_track
 from . import library, security, settings_store as store, torbox
 from .rds import redis
 from .release import parse, pick_file
@@ -91,12 +92,22 @@ async def play(
             await redis.setex(ck, 480, url)
         return {**base, "url": url, "proxy": proxy, "mime": _mime(f["name"])}
 
+    en_key = f"hlsen:{info_hash}:{f['id']}"
+    if audio_index is None and (known := await redis.get(en_key)) is not None:
+        audio_index = int(known)  # this file's English track, found on an earlier play
     ck = f"hls:{info_hash}:{f['id']}:{audio_index}:{subtitle_index}"
     raw = await redis.get(ck)
     if raw:
         s = json.loads(raw)
     else:
         s = torbox.normalize_stream(await torbox.create_stream(item["id"], f["id"], audio_index, subtitle_index))
+        if audio_index is None and s["hls_url"]:
+            # TorBox defaults to the file's first audio track, which in multi-language releases is often a dub.
+            # Start on English when the file has it (cached under its own key like any explicit choice).
+            eng = english_track(s["audios"])
+            if eng not in (None, 0):
+                await redis.setex(en_key, 86400, str(eng))
+                return await play(info_hash, season, episode, mode, ip, eng, subtitle_index, link_id, film)
         if not s["hls_url"]:
             raise _err(502, "NO_HLS", "TorBox couldn't prepare a transcoded stream for this file.")
         await redis.setex(ck, 1200, json.dumps(s))
