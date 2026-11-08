@@ -72,7 +72,6 @@ export interface TrackInfo {
 }
 
 const OUT_CPS = { aac: "mp4a.40.2", flac: "flac" } as const;
-const SPLIT_CODECS = new Set(["dts", "truehd"]);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export class RemuxSession {
@@ -100,7 +99,6 @@ export class RemuxSession {
   /** One lane (audio and video together) normally. Files with DTS/TrueHD audio get two lanes (video, audio), each
    *  with its own SourceBuffer, so the copied video never waits on audio converted on the device. */
   private lanes: Lane[] = [];
-  private split = false;
   /** Bytes pushed into the player so far: lets the watchdog tell "slow" from "stuck". */
   get appended() {
     return this.lanes.reduce((n, l) => n + l.appended, 0);
@@ -168,7 +166,6 @@ export class RemuxSession {
     this.audioIndex = this.audios.length ? best : 0;
     // Split lanes when any track is decoded on the device with a decoder that hands audio back more slowly than
     // the copied video arrives (DTS, TrueHD): one combined stream made the video wait for it (90 s chunks).
-    this.split = this.audios.some((x) => !x.copy && SPLIT_CODECS.has(x.codec));
   }
 
   /** AAC when the browser has an encoder, else FLAC through a small WASM encoder (works everywhere). */
@@ -258,7 +255,7 @@ export class RemuxSession {
     if (i === this.audioIndex || !this.audios[i]) return;
     this.audioIndex = i;
     const at = this.video?.currentTime ?? 0;
-    if (this.split) await this.restartLane(this.lanes[1], at); // the picture keeps playing; only the sound restarts
+    if (this.lanes[1]) await this.restartLane(this.lanes[1], at); // the picture keeps playing; only the sound restarts
     else await this.restart(at);
     this.onAudioSwitched();
   }
@@ -323,7 +320,10 @@ export class RemuxSession {
       const start = Math.max(0, Math.min(at, Math.max(0, this.duration - 1)));
       if (!this.lanes.length) {
         // All SourceBuffers must exist before any data is appended, so the layout is fixed for the session.
-        this.lanes = this.split && audio ? [new Lane("video"), new Lane("audio")] : [new Lane("av")];
+        // Video always goes through our own copy pipeline (separate from the sound), which trusts the file's key
+        // frames. A combined lane ran video through mediabunny's Conversion, which left gaps after the first
+        // fragment on some files: the picture froze a few seconds in with minutes buffered past the gap.
+        this.lanes = audio ? [new Lane("video"), new Lane("audio")] : [new Lane("video")];
         for (const l of this.lanes) {
           l.sb = this.mse.addSourceBuffer(this.mimeFor(l.kind, audio));
           l.sb.mode = "segments";
@@ -428,7 +428,7 @@ export class RemuxSession {
     source: import("mediabunny").EncodedVideoPacketSource,
     meta: { decoderConfig?: VideoDecoderConfig },
   ) {
-    const audioLane = this.split ? this.lanes[1] : null;
+    const audioLane = this.lanes[1] ?? null;
     let n = 0;
     let firstGop = true;
     let lastBytes = l.appended;
