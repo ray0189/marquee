@@ -403,6 +403,9 @@ export function Player(p: Props) {
             ref={player}
             key={p.hash + ":" + ready.mode + ":" + ready.url.slice(-24)}
             storage="marquee-player"
+            // Where to start: the player applies this once the film can play, and without it re-applied 0:00 over
+            // our resume jump, so every resumed film showed its opening seconds first.
+            currentTime={resumeAt.current > 5 ? resumeAt.current : 0}
             poster={bg}
             keyTarget="document"
             className="h-full w-full"
@@ -470,6 +473,15 @@ export function Player(p: Props) {
                 // Buffer two minutes ahead (up to ten when the stream is light), capped in bytes so phones stay within
                 // their memory; hls.js trims to fit by itself. Safari plays HLS natively and buffers on its own.
                 provider.config = { maxBufferLength: 120, maxMaxBufferLength: 600, maxBufferSize: (/iPhone|iPad|Android/i.test(navigator.userAgent) ? 90 : 200) * 1000 * 1000, backBufferLength: 30, enableWorker: true, capLevelToPlayerSize: true, startFragPrefetch: true, manifestLoadingMaxRetry: 4, levelLoadingMaxRetry: 4, fragLoadingMaxRetry: 6, nudgeMaxRetry: 8 };
+              }
+            }}
+            onLoadedMetadata={() => {
+              // Jump to the resume point as soon as the length is known, before the first frame: applying it on
+              // play showed (and fetched) the opening seconds first, then jumped, costing a second or two.
+              const pl = player.current;
+              if (pl && !resumed.current && resumeAt.current > 5) {
+                pl.currentTime = resumeAt.current;
+                resumed.current = true;
               }
             }}
             onCanPlay={() => {

@@ -295,11 +295,15 @@ class PlayReq(BaseModel):
 async def play(body: PlayReq, request: Request, link: LinkInfo = Depends(require_link), db: AsyncSession = Depends(get_db)):
     if body.media_type == "tv" and (body.season is None or body.episode is None):
         raise HTTPException(422, {"code": "EPISODE", "message": "season and episode are required"})
+    t0 = time.monotonic()
     film = None
     if body.media_type == "movie":  # lets a collection pack serve the right film
         m = await tmdb.meta("movie", body.tmdb_id)
         film = (m.get("title") or "", m.get("year"))
+    t1 = time.monotonic()
     res = await playback.play(body.hash.lower(), body.season, body.episode, body.mode, client_ip(request), body.audio_index, body.subtitle_index, link.id, film)
+    if (took := time.monotonic() - t0) > 1.5:
+        log.warning("slow play link=%s hash=%s mode=%s total=%.1fs tmdb=%.1fs", link.id, body.hash[:12], body.mode, took, t1 - t0)
     now = time.time()
     await redis.zadd("plays", {f"{link.id}:{now}": now})
     await redis.zremrangebyscore("plays", 0, now - 3600)
@@ -482,6 +486,7 @@ async def media(sig: str, request: Request):
     headers = {"Range": request.headers["range"]} if "range" in request.headers else {}
     c = client()
     timeout = httpx.Timeout(30.0, read=120.0)
+    t0 = time.monotonic()
     up = await c.send(c.build_request(request.method, url, headers=headers, timeout=timeout), stream=True)
     for _ in range(4):  # the shared client doesn't follow redirects; CDN hops would reach the browser without a Location
         if up.status_code not in (301, 302, 303, 307, 308) or not up.next_request:
@@ -493,6 +498,8 @@ async def media(sig: str, request: Request):
         await up.aclose()
         await redis.delete(ck, fk)  # the signed link may have expired; the next request fetches a new one
         raise HTTPException(502, {"code": "UPSTREAM", "message": f"TorBox's server answered {up.status_code}."})
+    if (took := time.monotonic() - t0) > 1.5:
+        log.warning("slow media link=%s first-byte=%.1fs range=%s", lid, took, headers.get("Range", ""))
     if str(up.request.url) != url:
         await redis.setex(fk, 300, str(up.request.url))
     out = {k: v for k, v in up.headers.items() if k.lower() in {"content-length", "content-range", "accept-ranges", "etag", "last-modified"}}
