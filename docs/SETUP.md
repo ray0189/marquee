@@ -226,6 +226,37 @@ docker compose up -d
 
 ---
 
+## Resetting the admin password
+
+If you know your current password, go to **Admin → Keys → Admin password**.
+
+If you forgot it:
+
+1. SSH into the server running Marquee.
+2. Check the API container: `docker ps -a --filter name=marquee-api-1`. If stopped, run `docker start marquee-api-1`.
+3. After installing the password recovery update, run:
+
+   ```bash
+   docker exec -it marquee-api-1 python -m app.cli set-admin-password
+   ```
+
+4. Enter and confirm your new password (10–200 characters). Input is hidden.
+5. Open `http://<server-ip>:8081/admin` and log in.
+
+Alternatively, run `docker exec marquee-api-1 python -m app.cli reset-admin-password` and immediately choose a new password on the local admin panel.
+
+### Older installations: "An admin password already exists"
+
+If the reset succeeds but the setup page returns this error, clear the stale Redis lock:
+
+```bash
+docker exec marquee-api-1 python -m app.cli reset-admin-password && docker exec marquee-redis-1 redis-cli DEL admin:setup_lock && docker restart marquee-api-1
+```
+
+Immediately refresh the local admin panel and choose a new password. These commands preserve your database,
+invite links, API keys and watch history. Substitute custom container names if necessary. Keep the admin port private.
+If authentication is configured through an admin token or Cloudflare Access, manage it through that configuration instead.
+
 ## Troubleshooting
 
 | Problem | Fix |
