@@ -1,7 +1,8 @@
 """Owner CLI:  docker compose exec api python -m app.cli create-link "Sami"
-                                                      list-links | revoke <id> | reset-admin-password"""
+                                                      list-links | revoke <id> | reset-admin-password | set-admin-password"""
 
 import asyncio
+import getpass
 import sys
 from datetime import datetime, timezone
 
@@ -12,7 +13,7 @@ from .config import cfg
 from .db import SessionLocal, init_db
 from .models import Link
 from .rds import redis
-from .security import encrypt, hash_token, new_token
+from .security import encrypt, hash_password, hash_token, new_token
 
 
 async def main(argv: list[str]) -> int:
@@ -38,7 +39,24 @@ async def main(argv: list[str]) -> int:
             print(f"revoked {link.label}")
         elif cmd == "reset-admin-password":
             await store.remove("admin_password")  # the next visit to admin asks for a new one
+            await redis.delete("admin:setup_lock")
             print("Admin password cleared. Open the admin panel to choose a new one.")
+        elif cmd == "set-admin-password":
+            if cfg.admin_token or (cfg.cf_access_team and cfg.cf_access_aud):
+                print("Admin authentication is controlled by environment configuration.")
+                return 1
+            if not sys.stdin.isatty():
+                print("An interactive terminal is required. Run without -T.")
+                return 1
+            password = getpass.getpass("New admin password: ")
+            if not 10 <= len(password) <= 200:
+                print("Password must be 10–200 characters.")
+                return 1
+            if password != getpass.getpass("Confirm password: "):
+                print("Passwords do not match. No changes made.")
+                return 1
+            await store.put("admin_password", hash_password(password))
+            print("Admin password updated. Log in with your new password.")
         else:
             print(__doc__)
             return 2
