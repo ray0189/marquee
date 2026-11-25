@@ -238,6 +238,6 @@ docker compose up -d
 | **Cloudflare shows error 502/1033** | The connector isn't running or can't see `web`. Check `docker compose logs cloudflared` and that the hostname's service is `http://web:80`. |
 | **Admin page won't open from your phone** | Use the server's IP with port **8081**, on the same Wi-Fi. Admin is deliberately not available through the tunnel. |
 | **Want to change the admin password** | Admin → **Keys** → **Admin password**. It asks for the current one first. |
-| **Forgot the admin password** | `docker compose exec api python -m app.cli reset-admin-password`, then choose a new one on your next visit to admin. |
+| **Forgot the admin password** | `docker compose exec api python -m app.cli set-admin-password` from the installation folder, or `docker exec -it marquee-api-1 python -m app.cli set-admin-password` with the default container name. Enter and confirm the new password privately in the terminal. Alternatively, `docker compose exec api python -m app.cli reset-admin-password` clears the password and setup lock; immediately choose a new one on the local admin panel. |
 | **`exec /srv/docker-entrypoint.sh: no such file or directory`** (Windows) | A clone made before line endings were pinned has Windows (CRLF) endings. Update and re-checkout, then rebuild: `git pull`, `git rm -r --cached . -q`, `git reset --hard`, `docker compose up -d --build`. New clones don't need this. |
 | **Something else** | `docker compose logs api --tail 100` usually says what's wrong. |
