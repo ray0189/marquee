@@ -226,6 +226,37 @@ docker compose up -d
 
 ---
 
+## Resetting the admin password
+
+If you know your current password, go to **Admin → Keys → Admin password**.
+
+If you forgot it:
+
+1. SSH into the server running Marquee.
+2. Check the API container: `docker ps -a --filter name=marquee-api-1`. If stopped, run `docker start marquee-api-1`.
+3. After installing the password recovery update, run:
+
+   ```bash
+   docker exec -it marquee-api-1 python -m app.cli set-admin-password
+   ```
+
+4. Enter and confirm your new password (10–200 characters). Input is hidden.
+5. Open `http://<server-ip>:8081/admin` and log in.
+
+Alternatively, run `docker exec marquee-api-1 python -m app.cli reset-admin-password` and immediately choose a new password on the local admin panel.
+
+### Older installations: "An admin password already exists"
+
+If the reset succeeds but the setup page returns this error, clear the stale Redis lock:
+
+```bash
+docker exec marquee-api-1 python -m app.cli reset-admin-password && docker exec marquee-redis-1 redis-cli DEL admin:setup_lock && docker restart marquee-api-1
+```
+
+Immediately refresh the local admin panel and choose a new password. These commands preserve your database,
+invite links, API keys and watch history. Substitute custom container names if necessary. Keep the admin port private.
+If authentication is configured through an admin token or Cloudflare Access, manage it through that configuration instead.
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -238,6 +269,6 @@ docker compose up -d
 | **Cloudflare shows error 502/1033** | The connector isn't running or can't see `web`. Check `docker compose logs cloudflared` and that the hostname's service is `http://web:80`. |
 | **Admin page won't open from your phone** | Use the server's IP with port **8081**, on the same Wi-Fi. Admin is deliberately not available through the tunnel. |
 | **Want to change the admin password** | Admin → **Keys** → **Admin password**. It asks for the current one first. |
-| **Forgot the admin password** | `docker compose exec api python -m app.cli reset-admin-password`, then choose a new one on your next visit to admin. |
+| **Forgot the admin password** | `docker compose exec api python -m app.cli set-admin-password` from the installation folder, or `docker exec -it marquee-api-1 python -m app.cli set-admin-password` with the default container name. Enter and confirm the new password privately in the terminal. Alternatively, `docker compose exec api python -m app.cli reset-admin-password` clears the password and setup lock; immediately choose a new one on the local admin panel. |
 | **`exec /srv/docker-entrypoint.sh: no such file or directory`** (Windows) | A clone made before line endings were pinned has Windows (CRLF) endings. Update and re-checkout, then rebuild: `git pull`, `git rm -r --cached . -q`, `git reset --hard`, `docker compose up -d --build`. New clones don't need this. |
 | **Something else** | `docker compose logs api --tail 100` usually says what's wrong. |
